@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* =========================================================================
+   Standard 80mm ESC/POS Thermal Receipt Print Engine
+   ========================================================================= */
+@page {
+  size: 80mm auto;
+  margin: 0mm;
+}
+
+@media print {
+  /* Prevent browser multi-page overflow caused by background dashboard layout */
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Hide all ambient application UI, navigation, sidebars, and overlays */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Exclusively render thermal receipt target */
+  #thermal-receipt,
+  #thermal-receipt *,
+  .thermal-receipt,
+  .thermal-receipt * {
+    visibility: visible !important;
+    color: #000000 !important;
+  }
+
+  #thermal-receipt,
+  .thermal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    background: white !important;
+    color: black !important;
+    font-family: 'Courier New', Courier, monospace, system-ui;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    box-shadow: none !important;
+    border: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  #thermal-receipt *,
+  .thermal-receipt * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Universal hide utility for modal controls, buttons, toolbars */
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Support for printable daily report modal if active */
+  .printable-daily-report,
+  .printable-daily-report * {
+    visibility: visible;
+  }
+
+  .printable-daily-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    padding: 15px !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-family: system-ui, -apple-system, sans-serif !important;
+  }
+}

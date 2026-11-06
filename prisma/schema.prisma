@@ -1,0 +1,477 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  PHARMACIST
+  DOCTOR
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ShiftStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  OPEN
+  CLOSED
+}
+
+enum DrawerAdjustmentType {
+  CASH_IN
+  CASH_OUT
+}
+
+enum PortalType {
+  RECEPTION
+  PHARMACY
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  APPROVED
+  DELIVERED
+  CANCELLED
+}
+
+enum TokenType {
+  MANUAL_RESERVED
+  AUTO_SEQUENCE
+}
+
+enum TokenStatus {
+  ISSUED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  displayPassword String?
+  role      Role     @default(RECEPTIONIST)
+  biometricHash String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  auditLogs                 AuditLog[]
+  approvalRequests          ApprovalRequest[]
+  invoices                  Invoice[]
+  sales                     PharmacySale[]
+  biometricEnrollments      UserBiometricEnrollment[]
+  shiftClosings             ShiftClosing[]           @relation("UserShiftClosings")
+  approvedShifts            ShiftClosing[]           @relation("ApprovedShifts")
+  drawerAdjustments         DrawerAdjustment[]       @relation("UserDrawerAdjustments")
+  approvedDrawerAdjustments DrawerAdjustment[]       @relation("ApprovedDrawerAdjustments")
+  expenditures              Expenditure[]
+  vendorPayments            VendorPayment[]
+  tokenLogs                 DailyTokenLog[]          @relation("UserTokenLogs")
+}
+
+model Patient {
+  id            String   @id @default(cuid())
+  patientUid    String   @unique
+  name          String
+  phone         String
+  age           Int
+  gender        String
+  cnic          String?
+  biometricHash String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  visits               Visit[]
+  invoices             Invoice[]
+  pharmacySales        PharmacySale[]
+  biometricCredentials BiometricCredential[]
+  biometricEnrollments PatientBiometricEnrollment[]
+  tokenLogs            DailyTokenLog[]
+}
+
+model Visit {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  tokenId     String?
+  token       DailyTokenLog? @relation(fields: [tokenId], references: [id])
+  serviceType String   // e.g. "OPD", "Ultrasound", "Consultation"
+  fee         Float
+  notes       String?  // Doctor's clinical notes & findings
+  diagnosis   String?  // Clinical diagnosis / impression
+  createdAt   DateTime @default(now())
+  
+  invoice     Invoice?
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  patientId     String
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  visitId       String?       @unique
+  visit         Visit?        @relation(fields: [visitId], references: [id])
+  tokenId       String?
+  token         DailyTokenLog? @relation(fields: [tokenId], references: [id])
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  totalAmount   Float
+  discount      Float         @default(0)
+  paymentMethod String        @default("CASH")
+  status        String        @default("PAID") // PAID, CANCELLED
+  createdAt     DateTime      @default(now())
+
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  quantity    Int
+  price       Float
+}
+
+model Medicine {
+  id          String             @id @default(cuid())
+  name        String
+  genericName String
+  category    String
+  itemType    String             @default("MEDICINE") // "MEDICINE" | "SURGICAL"
+  threshold   Int                @default(10)
+  perOff      Float              @default(0) // Percentage off / discount rate (0 to 100)
+  createdAt   DateTime           @default(now())
+
+  batches     StockBatch[]
+  saleItems   PharmacySaleItem[]
+
+  @@index([itemType])
+  @@index([category])
+  @@index([name])
+}
+
+model StockBatch {
+  id             String         @id @default(cuid())
+  medicineId     String
+  medicine       Medicine       @relation(fields: [medicineId], references: [id])
+  batchNumber    String
+  quantity       Int
+  purchasePrice  Float
+  sellingPrice   Float
+  perOff         Float          @default(0) // Batch specific percentage off
+  mfgDate        DateTime
+  expiryDate     DateTime
+  approvalStatus ApprovalStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+}
+
+model PharmacySale {
+  id          String             @id @default(cuid())
+  saleNumber  String             @unique
+  patientId   String?
+  patient     Patient?           @relation(fields: [patientId], references: [id])
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+  totalAmount Float
+  discount    Float              @default(0)
+  createdAt   DateTime           @default(now())
+
+  items       PharmacySaleItem[]
+}
+
+model PharmacySaleItem {
+  id         String       @id @default(cuid())
+  saleId     String
+  sale       PharmacySale @relation(fields: [saleId], references: [id])
+  medicineId String
+  medicine   Medicine     @relation(fields: [medicineId], references: [id])
+  itemType   String?      @default("MEDICINE") // "MEDICINE" | "SURGICAL"
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+}
+
+model ApprovalRequest {
+  id            String         @id @default(cuid())
+  type          String         // "INVENTORY_ADD", "PURCHASE_ORDER", "THRESHOLD_CHANGE"
+  details       String         // JSON stringified details
+  requestedById String
+  requestedBy   User           @relation(fields: [requestedById], references: [id])
+  status        ApprovalStatus @default(PENDING)
+  comment       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+}
+
+model BiometricCredential {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  credentialId String   @unique // base64url or hex encoded credential ID
+  publicKey    String   // base64url or hex encoded public key / attestation
+  counter      Int      @default(0)
+  deviceType   String?  // e.g. "Windows Hello / Touch ID"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BiometricChallenge {
+  id        String   @id @default(cuid())
+  challenge String   @unique
+  patientId String?  // Optional during registration
+  purpose   String   // "REGISTRATION" | "AUTHENTICATION"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model UserBiometricEnrollment {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerPosition    String   @default("RIGHT_INDEX") // RIGHT_INDEX, RIGHT_THUMB, LEFT_INDEX, LEFT_THUMB
+  encryptedTemplate String   // AES-256-GCM encrypted biometric minutiae template
+  templateAlgorithm String   @default("ISO_19794_2_MINUTIAE")
+  qualityScore      Int      @default(90)
+  scannerModel      String   // e.g. "Mock Dev Scanner v1" or "DigitalPersona U.are.U 4500"
+  adapterType       String   @default("MOCK") // "MOCK" | "VENDOR_LOCAL_AGENT"
+  enrolledById      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, fingerPosition])
+}
+
+model PatientBiometricEnrollment {
+  id                String   @id @default(cuid())
+  patientId         String
+  patient           Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  fingerPosition    String   @default("RIGHT_THUMB") // RIGHT_THUMB, RIGHT_INDEX, LEFT_THUMB, LEFT_INDEX
+  encryptedTemplate String   // AES-256-GCM encrypted biometric minutiae template
+  templateAlgorithm String   @default("ISO_19794_2_MINUTIAE")
+  qualityScore      Int      @default(90)
+  scannerModel      String   // e.g. "Mock Dev Scanner v1" or "DigitalPersona U.are.U 4500"
+  adapterType       String   @default("MOCK") // "MOCK" | "VENDOR_LOCAL_AGENT"
+  enrolledById      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([patientId, fingerPosition])
+}
+
+
+
+model ShiftClosing {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation("UserShiftClosings", fields: [userId], references: [id])
+  portal          PortalType  @default(RECEPTION)
+  shiftDate       DateTime    @default(now())
+  totalSystemCash Float
+  countedCash     Float
+  variance        Float
+  notes           String?
+  status          ShiftStatus @default(PENDING_APPROVAL)
+  approvedById    String?
+  approvedBy      User?       @relation("ApprovedShifts", fields: [approvedById], references: [id])
+  adminComment    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model DrawerAdjustment {
+  id           String               @id @default(cuid())
+  userId       String
+  user         User                 @relation("UserDrawerAdjustments", fields: [userId], references: [id])
+  type         DrawerAdjustmentType // CASH_IN, CASH_OUT
+  amount       Float
+  remarks      String
+  status       ApprovalStatus       @default(PENDING) // PENDING, APPROVED, REJECTED
+  approvedById String?
+  approvedBy   User?                @relation("ApprovedDrawerAdjustments", fields: [approvedById], references: [id])
+  adminComment String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+}
+
+model Expenditure {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  portal    PortalType // RECEPTION or PHARMACY
+  amount    Float
+  category  String     // e.g., Utility Bills, Office Supplies, Maintenance, Miscellaneous
+  remarks   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Vendor {
+  id            String          @id @default(cuid())
+  name          String          @unique
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  balance       Float           @default(0) // Balance owed to vendor in PKR
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  payments       VendorPayment[]
+}
+
+model PurchaseOrder {
+  id            String              @id @default(cuid())
+  poNumber      String              @unique // PO-YYYY-XXXX
+  vendorId      String
+  vendor        Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  totalAmount   Float
+  paidAmount    Float               @default(0)
+  paymentStatus PaymentStatus       @default(UNPAID)
+  status        PurchaseOrderStatus @default(APPROVED)
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  items         PurchaseOrderItem[]
+  payments      VendorPayment[]
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  medicineName    String
+  genericName     String?
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+}
+
+model VendorPayment {
+  id              String         @id @default(cuid())
+  paymentNumber   String         @unique // VP-YYYY-XXXX
+  vendorId        String
+  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  amount          Float
+  paymentMethod   String         // Cash, Raast, Bank Transfer, Cheque
+  referenceNumber String?        // Bank / Raast Ref / Cheque #
+  notes           String?
+  paidById        String
+  paidBy          User           @relation(fields: [paidById], references: [id])
+  paymentDate     DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+}
+
+model InventoryPurchase {
+  id                  String   @id @default(cuid())
+  itemName            String   // Product Name
+  specification       String   // Gauge / Size / Specification
+  pkgPacks            Int      // PKGPacks
+  nosPerPack          Int      // Nos Per pack
+  totalCost           Float    // Total cost
+  perUnitCost         Float    // Cost Per Tab/Unit
+  perPackCost         Float    // Cost Per pack
+  totalValue          Float    // T.Value
+  perUnitSellingPrice Float    // Selling Price Per Tab/Unit
+  qtyPurchased        Int      // Qty Pur
+  threshold           Int      @default(10) // Low-stock threshold
+  perOff              Float    @default(0)  // Percentage off / discount rate
+  batchNo             String   // Batch number
+  expiryDate          DateTime // Expiry date
+  isCredit            Boolean  @default(false) // Credit status
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([itemName])
+  @@index([batchNo])
+}
+
+model MedicineInventory {
+  id              String   @id @default(cuid())
+  sNo             Int      // S.No
+  itemName        String   // Item / Product Name
+  formPotencySpec String   // Form / Potency / Specification
+  pkgPacks        Int      // PKGPacks
+  nosPerPack      Int      // Nos Per pack
+  totalCost       Float    // Total cost
+  perUnitCost     Float    // Per Tab / Unit Cost
+  perPackCost     Float    // Per pack Cost
+  totalValue      Float    // T.Value
+  perUnitSelling  Float    // Per Tab / Unit Selling Price
+  qtyPurchased    Int      // Qty Pur
+  threshold       Int      @default(10) // Low-stock threshold
+  perOff          Float    @default(0)  // Percentage off / discount rate
+  batchNo         String   // Batch no
+  expiryDate      DateTime // Expiry date
+  isCredit        Boolean  @default(false) // Credit status
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([itemName])
+  @@index([batchNo])
+  @@index([sNo])
+}
+
+model DailyTokenLog {
+  id          String      @id @default(cuid())
+  dateStr     String      // Format YYYY-MM-DD
+  tokenNumber Int         // The issued token number (1, 2, 3, 4, 5, 6...)
+  tokenType   TokenType
+  status      TokenStatus @default(ISSUED)
+  issuedById  String
+  issuedBy    User        @relation("UserTokenLogs", fields: [issuedById], references: [id])
+  patientId   String?
+  patient     Patient?    @relation(fields: [patientId], references: [id])
+  fee         Float       @default(300)
+  services    Json?
+  visits      Visit[]
+  invoices    Invoice[]
+  createdAt   DateTime    @default(now())
+
+  @@index([dateStr])
+  @@index([tokenNumber])
+  @@index([status])
+  @@index([patientId])
+}
+
+model DailyTokenCounter {
+  id                 String   @id @default(cuid())
+  dateStr            String   @unique // Format YYYY-MM-DD
+  lastAutoNumber     Int      @default(4) // Starts at 5 on a new day (incremented before issue)
+  issuedManualTokens Int[]    @default([])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([dateStr])
+}

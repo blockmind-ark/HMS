@@ -1,0 +1,93 @@
+# ==============================================================================
+# Hospital & Pharmacy Management System (HMS) - Dedicated Production Compose
+# ==============================================================================
+# Isolated from dev/test: dedicated network (hms_prod_network) and volume (hms_pgdata_prod).
+# Container names: hms_postgres_prod, hms_app_prod.
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Production Database Service
+  # ----------------------------------------------------------------------------
+  postgres_prod:
+    image: postgres:15-alpine
+    container_name: hms_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hms_prod_secure_pass_2026!}
+      POSTGRES_DB: ${POSTGRES_DB:-hms_prod}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    expose:
+      - "5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-hms_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - hms_prod_network
+
+  # ----------------------------------------------------------------------------
+  # 2. Next.js Hospital & Pharmacy Production Web Application
+  # ----------------------------------------------------------------------------
+  app_prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hms_app_prod:latest
+    container_name: hms_app_prod
+    restart: always
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-hms_prod_secure_pass_2026!}@postgres_prod:5432/${POSTGRES_DB:-hms_prod}?schema=public
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-hms_prod_nextauth_jwt_secret_key_84920491_2026}
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      # Workstation Network & IP Policies (default open on internal hospital LAN; customizable)
+      PORTAL_IP_RESTRICTIONS_ENABLED: ${PORTAL_IP_RESTRICTIONS_ENABLED:-false}
+      ALLOWED_IPS_ADMIN: ${ALLOWED_IPS_ADMIN:-*}
+      ALLOWED_IPS_RECEPTIONIST: ${ALLOWED_IPS_RECEPTIONIST:-*}
+      ALLOWED_IPS_DOCTOR: ${ALLOWED_IPS_DOCTOR:-*}
+      ALLOWED_IPS_PHARMACIST: ${ALLOWED_IPS_PHARMACIST:-*}
+      ALLOWED_DOMAINS_ADMIN: ${ALLOWED_DOMAINS_ADMIN:-*}
+      ALLOWED_DOMAINS_RECEPTIONIST: ${ALLOWED_DOMAINS_RECEPTIONIST:-*}
+      ALLOWED_DOMAINS_DOCTOR: ${ALLOWED_DOMAINS_DOCTOR:-*}
+      ALLOWED_DOMAINS_PHARMACIST: ${ALLOWED_DOMAINS_PHARMACIST:-*}
+    depends_on:
+      postgres_prod:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - hms_prod_network
+
+# ------------------------------------------------------------------------------
+# Dedicated Production Volumes
+# ------------------------------------------------------------------------------
+volumes:
+  pgdata_prod:
+    name: hms_pgdata_prod
+
+# ------------------------------------------------------------------------------
+# Isolated Production Bridge Network
+# ------------------------------------------------------------------------------
+networks:
+  hms_prod_network:
+    name: hms_prod_network
+    driver: bridge
+
