@@ -43,7 +43,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: hms_app_prod:latest
+    image: taimoorsunny/hms-app-prod:latest
     container_name: hms_app_prod
     restart: always
     ports:
