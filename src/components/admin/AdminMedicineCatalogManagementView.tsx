@@ -17,7 +17,10 @@ import {
   Save,
   ChevronLeft,
   ChevronRight,
+  Upload,
+  Download,
 } from "lucide-react";
+import { MedicineCsvImportModal } from "./MedicineCsvImportModal";
 
 interface AdminMedicineItem {
   id: string;
@@ -46,6 +49,7 @@ export function AdminMedicineCatalogManagementView() {
   const [editingMed, setEditingMed] = useState<AdminMedicineItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Form State for Editing
   const [editForm, setEditForm] = useState({
@@ -53,6 +57,7 @@ export function AdminMedicineCatalogManagementView() {
     sellingPrice: "0",
     purchasePrice: "0",
     threshold: "10",
+    quantity: "0",
   });
 
   const fetchMedicines = async () => {
@@ -89,12 +94,28 @@ export function AdminMedicineCatalogManagementView() {
       sellingPrice: String(med.sellingPrice ?? 0),
       purchasePrice: String(med.purchasePrice ?? 0),
       threshold: String(med.threshold ?? 10),
+      quantity: String(med.totalStock ?? 0),
     });
   };
 
   const handleSaveDynamicPerOff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMed) return;
+
+    // Validate Quantity: non-negative integer
+    const parsedQty = Number(editForm.quantity);
+    if (isNaN(parsedQty) || !Number.isInteger(parsedQty) || parsedQty < 0) {
+      alert("Quantity (QTY) must be a valid whole number (0 or greater).");
+      return;
+    }
+
+    // Validate Selling Price: non-negative number
+    const parsedSp = Number(editForm.sellingPrice);
+    if (isNaN(parsedSp) || parsedSp < 0) {
+      alert("Selling Price must be a valid non-negative number.");
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/medicines/${editingMed.id}`, {
@@ -105,17 +126,18 @@ export function AdminMedicineCatalogManagementView() {
           sellingPrice: editForm.sellingPrice,
           purchasePrice: editForm.purchasePrice,
           threshold: editForm.threshold,
+          quantity: parsedQty,
         }),
       });
 
       const data = await res.json();
       if (res.ok) {
-        setNotification(`Successfully updated ${editingMed.name} with ${editForm.perOff}% Per-Off discount!`);
+        setNotification(`Successfully updated ${editingMed.name}: QTY ${parsedQty} units, Rs. ${parsedSp}, ${editForm.perOff}% Off.`);
         setEditingMed(null);
         fetchMedicines();
         setTimeout(() => setNotification(null), 4000);
       } else {
-        alert(data.error || "Failed to update medicine per-off");
+        alert(data.error || "Failed to update medicine record");
       }
     } catch (err: any) {
       alert(err.message || "Network error");
@@ -166,7 +188,27 @@ export function AdminMedicineCatalogManagementView() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/api/inventory/medicines/export"
+              download
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-200"
+              title="Download Medicine CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Medicine CSV</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Upload and Import Medicine CSV"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload &amp; Import</span>
+            </button>
+
             <button
               onClick={fetchMedicines}
               disabled={loading}
@@ -320,7 +362,7 @@ export function AdminMedicineCatalogManagementView() {
                         className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold border border-purple-200 transition-colors inline-flex items-center gap-1.5"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
-                        <span>Edit Per Off</span>
+                        <span>Update Medicine</span>
                       </button>
                     </td>
                   </tr>
@@ -378,7 +420,7 @@ export function AdminMedicineCatalogManagementView() {
               <div className="flex items-center gap-2.5">
                 <Sliders className="w-5 h-5 text-purple-400" />
                 <div>
-                  <h3 className="text-sm font-bold">Dynamic Per Off &amp; Pricing Control</h3>
+                  <h3 className="text-sm font-bold">Update Medicine / Pricing &amp; Stock Control</h3>
                   <p className="text-[11px] text-purple-200">
                     {editingMed.name} ({editingMed.genericName})
                   </p>
@@ -394,7 +436,30 @@ export function AdminMedicineCatalogManagementView() {
 
             <form onSubmit={handleSaveDynamicPerOff} className="p-6 space-y-4">
               <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-xs">
-                <strong>Immediate Direct Update:</strong> Changes will be committed directly to the medicine master and its active batches with immediate effect in Pharmacy POS.
+                <strong>Immediate Direct Update:</strong> Changes will be committed directly to the medicine master, active batches, and dispensary inventory.
+              </div>
+
+              {/* Quantity (QTY) */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Quantity (QTY) / Current Stock Units *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={editForm.quantity}
+                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g. 100"
+                  />
+                  <span className="absolute right-3 top-2 text-[11px] text-slate-400 font-bold">Units</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Live dispensary available inventory stock units.
+                </p>
               </div>
 
               <div>
@@ -486,6 +551,18 @@ export function AdminMedicineCatalogManagementView() {
           </div>
         </div>
       )}
+
+      {/* CSV Import Modal with Pre-Validation */}
+      <MedicineCsvImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
+          fetchMedicines();
+          setNotification("Successfully validated and imported medicines!");
+          setTimeout(() => setNotification(null), 4000);
+        }}
+      />
     </div>
   );
 }

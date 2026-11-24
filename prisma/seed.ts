@@ -7,7 +7,7 @@ import { syncPosCatalogFromInventory } from "./sync-pos-catalog";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding Ruqayya Clinic & Pharmacy database (Pakistani PKR & Users)...");
+  console.log("Seeding Ruqayya Medical Center & Pharmacy database (Pakistani PKR & Users)...");
 
   // 1. Clean existing data in reverse order of foreign key relationships
   await prisma.medicineInventory.deleteMany();
@@ -741,7 +741,7 @@ async function main() {
     {
       userId: admin.id,
       action: "SYSTEM_INITIALIZATION",
-      details: "Ruqayya Clinic & Pharmacy management system initialized with RBAC boundaries.",
+      details: "Ruqayya Medical Center & Pharmacy management system initialized with RBAC boundaries.",
       createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
     },
     {
@@ -789,7 +789,35 @@ async function main() {
   // 12. Synchronize POS Billing & Dispensary Catalog (Medicines + Surgical Supplies)
   await syncPosCatalogFromInventory(prisma);
 
-  console.log("Ruqayya Clinic database seeding completed successfully in Rupees (PKR)!");
+  // 13. Seed Ultrasound Services & Token Services
+  const ultrasoundPresets = [
+    { name: "Ultrasound Abdomen", price: 700.0 },
+    { name: "Ultrasound TVS", price: 1200.0 },
+    { name: "Ultrasound Liver, Kidney & Stomach", price: 1200.0 },
+  ];
+  for (const us of ultrasoundPresets) {
+    await prisma.ultrasoundService.upsert({
+      where: { name: us.name },
+      update: {},
+      create: { name: us.name, price: us.price, isActive: true },
+    });
+  }
+
+  const tokenPresets = [
+    { name: "OPD Fees", fee: 300.0 },
+    { name: "Sugar Test", fee: 100.0 },
+    { name: "U P D", fee: 100.0 },
+    { name: "BP", fee: 50.0 },
+  ];
+  for (const ts of tokenPresets) {
+    await prisma.tokenService.upsert({
+      where: { name: ts.name },
+      update: {},
+      create: { name: ts.name, fee: ts.fee, isActive: true },
+    });
+  }
+
+  console.log("Ruqayya Medical Center database seeding completed successfully in Rupees (PKR)!");
 }
 
 main()

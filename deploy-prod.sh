@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 
 echo -e "${CYAN}${BOLD}"
 echo "================================================================================"
-echo "          Ruqayya Clinic & Pharmacy Management System (HMS)                     "
+echo "          Ruqayya Medical Center & Pharmacy Management System (HMS)                     "
 echo "                     Production On-Premise Deployment                           "
 echo "================================================================================"
 echo -e "${NC}"

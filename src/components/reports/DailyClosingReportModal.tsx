@@ -84,7 +84,7 @@ export function DailyClosingReportModal({
 
     const csvContent =
       "data:text/csv;charset=utf-8," +
-      [`Ruqayya CLINIC & PHARMACY - DAILY CLOSING REPORT (${data.date})`,
+      [`Ruqayya MEDICAL CENTER & PHARMACY - DAILY CLOSING REPORT (${data.date})`,
        `Staff: ${data.staffName} (${data.staffRole})`,
        `Total Sales Revenue: Rs. ${data.totalRevenue}`,
        `Total Items Sold: ${data.totalItemsCount}`,
@@ -124,7 +124,7 @@ export function DailyClosingReportModal({
                 Daily Sales &amp; Cash Accountability Preview
               </h3>
               <p className="text-[11px] text-slate-400">
-                Ruqayya Clinic &amp; Pharmacy · {data.portalType === "RECEPTIONIST" ? "Reception Billing Desk" : "Dispensary POS"}
+                Ruqayya Medical Center &amp; Pharmacy · {data.portalType === "RECEPTIONIST" ? "Reception Billing Desk" : "Dispensary POS"}
               </p>
             </div>
           </div>
@@ -163,7 +163,7 @@ export function DailyClosingReportModal({
                 Official Shift Closing Ledger
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-slate-950 mt-1.5">
-                Ruqayya CLINIC &amp; PHARMACY
+                Ruqayya MEDICAL CENTER &amp; PHARMACY
               </h1>
               <p className="text-xs text-slate-500">
                 Main Boulevard, G.T. Road, Lahore · Tel: +92 (42) 3589-1122
@@ -419,7 +419,7 @@ export function DailyClosingReportModal({
         {/* Modal Footer Controls */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0 print:hidden">
           <p className="text-[11px] text-slate-500">
-            Audit timestamp: {new Date().toLocaleTimeString()} · Ruqayya Clinic POS v1.0
+            Audit timestamp: {new Date().toLocaleTimeString()} · Ruqayya Medical Center POS v1.0
           </p>
           <div className="flex items-center gap-2">
             <button

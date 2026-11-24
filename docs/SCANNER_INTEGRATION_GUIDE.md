@@ -1,7 +1,7 @@
 # Enterprise Fingerprint Scanner Integration Guide
-**Ruqayya Clinic & Pharmacy Hospital Management System**
+**Ruqayya Medical Center & Pharmacy Hospital Management System**
 
-This document details the architecture, local scanner service daemon, and vendor SDK requirements for connecting physical optical USB fingerprint scanners to the Ruqayya Clinic web portal on Ubuntu / Linux.
+This document details the architecture, local scanner service daemon, and vendor SDK requirements for connecting physical optical USB fingerprint scanners to the Ruqayya Medical Center web portal on Ubuntu / Linux.
 
 ---
 

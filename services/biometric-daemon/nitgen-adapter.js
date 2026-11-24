@@ -1,5 +1,5 @@
 /**
- * Ruqayya Clinic & Pharmacy - NITGEN HFDU06M Linux Hardware Adapter
+ * Ruqayya Medical Center & Pharmacy - NITGEN HFDU06M Linux Hardware Adapter
  * 
  * Target Hardware:
  *   - Manufacturer: NITGen Co., Ltd (UnionCommunity)

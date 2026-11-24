@@ -3,7 +3,7 @@ import * as bcrypt from "bcryptjs";
 
 async function runVerification() {
   console.log("=================================================");
-  console.log("🏥 STARTING Ruqayya CLINIC & PHARMACY COMPREHENSIVE VERIFICATION");
+  console.log("🏥 STARTING Ruqayya MEDICAL CENTER & PHARMACY COMPREHENSIVE VERIFICATION");
   console.log("=================================================\n");
 
   let passed = 0;

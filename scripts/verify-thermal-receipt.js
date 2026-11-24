@@ -133,7 +133,7 @@ async function runTests() {
   if (!componentTsx.includes('id="thermal-receipt"')) {
     throw new Error('id="thermal-receipt" missing from ThermalReceiptModal.tsx!');
   }
-  if (!componentTsx.includes("RUQAYYA CLINIC &amp; PHARMACY")) {
+  if (!componentTsx.includes("RUQAYYA MEDICAL CENTER &amp; PHARMACY")) {
     throw new Error("Hospital header missing from ThermalReceiptModal.tsx!");
   }
   if (!componentTsx.includes("*** Thank you! Get well soon. ***")) {

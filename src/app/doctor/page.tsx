@@ -24,9 +24,13 @@ import {
   Save,
   X,
   Filter,
+  Banknote,
+  UserCheck,
 } from "lucide-react";
+import { DoctorSelfServicePayrollView } from "@/components/doctor/DoctorSelfServicePayrollView";
 
 export default function DoctorPortal() {
+  const [portalView, setPortalView] = useState<"patients" | "compensation">("patients");
   const [patients, setPatients] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingPatients, setLoadingPatients] = useState(false);
@@ -182,7 +186,38 @@ export default function DoctorPortal() {
           </div>
         </div>
 
-        {/* Main Grid: Left Search & Patient List (4 Cols) | Right Medical History Dossier (8 Cols) */}
+        {/* View Switcher Tabs (Hidden on print) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 print:hidden">
+          <button
+            onClick={() => setPortalView("patients")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              portalView === "patients"
+                ? "bg-teal-600 text-white shadow-md shadow-teal-500/20"
+                : "text-slate-600 hover:bg-slate-200/60"
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Assigned Patients &amp; Consultations</span>
+          </button>
+
+          <button
+            onClick={() => setPortalView("compensation")}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+              portalView === "compensation"
+                ? "bg-teal-600 text-white shadow-md shadow-teal-500/20"
+                : "text-slate-600 hover:bg-slate-200/60"
+            }`}
+          >
+            <Banknote className="w-4 h-4" />
+            <span>My Compensation &amp; Working Days</span>
+          </button>
+        </div>
+
+        {/* View 1: Compensation & Working Days Self-Service */}
+        {portalView === "compensation" && <DoctorSelfServicePayrollView />}
+
+        {/* View 2: Assigned Patient Roster & Dossier */}
+        {portalView === "patients" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT: Search & Patient Roster (Hidden on print) */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-4 print:hidden">
@@ -298,7 +333,7 @@ export default function DoctorPortal() {
             {/* Official Print Header (Visible only on window.print()) */}
             <div className="hidden print:block text-center pb-5 mb-5 border-b-2 border-slate-900 space-y-1.5">
               <h1 className="text-2xl font-black uppercase tracking-wider">
-                Ruqayya CLINIC &amp; PHARMACY
+                Ruqayya MEDICAL CENTER &amp; PHARMACY
               </h1>
               <p className="text-sm text-slate-700 font-bold uppercase tracking-wide">
                 OFFICIAL PATIENT MEDICAL HISTORY &amp; CLINICAL DOSSIER
@@ -908,7 +943,7 @@ export default function DoctorPortal() {
                       <p className="text-xs text-slate-600 mt-0.5">Signature, PMDC Reg &amp; Clinical Stamp</p>
                     </div>
                     <div className="border-t-2 border-slate-900 pt-3 text-right">
-                      <p className="font-black text-slate-900">Ruqayya Clinic Medical Records</p>
+                      <p className="font-black text-slate-900">Ruqayya Medical Center Medical Records</p>
                       <p className="text-xs text-slate-600 mt-0.5">Verified Confidential Patient Dossier</p>
                     </div>
                   </div>
@@ -930,6 +965,7 @@ export default function DoctorPortal() {
             )}
           </div>
         </div>
+        )}
 
       </main>
     </div>

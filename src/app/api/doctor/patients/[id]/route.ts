@@ -168,11 +168,20 @@ export async function POST(
       return NextResponse.json({ error: "visitId is required" }, { status: 400 });
     }
 
+    let docId: string | undefined = undefined;
+    if (session.user.role === "DOCTOR") {
+      const doc = await prisma.doctor.findFirst({
+        where: { OR: [{ userId: session.user.id }, { email: session.user.email }] },
+      });
+      if (doc) docId = doc.id;
+    }
+
     const updatedVisit = await prisma.visit.update({
       where: { id: visitId },
       data: {
         diagnosis: diagnosis || null,
         notes: notes || null,
+        doctorId: docId || undefined,
       },
     });
 

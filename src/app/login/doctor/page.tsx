@@ -198,7 +198,7 @@ export default function DoctorLoginPage() {
         </Suspense>
 
         <div className="mt-6 text-center text-xs text-teal-300/60">
-          Clinical Examination Room · Ruqayya Clinic
+          Clinical Examination Room · Ruqayya Medical Center
         </div>
       </div>
     </div>

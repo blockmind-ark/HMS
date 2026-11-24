@@ -1,4 +1,4 @@
-# Ruqayya Clinic: Hospital & Pharmacy Management System (HMS)
+# Ruqayya Medical Center: Hospital & Pharmacy Management System (HMS)
 
 An integrated, role-based Hospital & Pharmacy Management System built for seamless healthcare operations, audit compliance, clinical invoicing, and dispensary POS.
 
@@ -64,7 +64,7 @@ An integrated, role-based Hospital & Pharmacy Management System built for seamle
   - **Clinical Findings & Diagnosis Recording:** Doctors can record or update diagnoses (e.g. Acute URTI, Essential Hypertension) and clinical instructions directly into the patient's permanent record.
   - **Dispensary & Medication History:** Complete pharmacy dispensing history detailing brand names, generic names, categories, quantities, and prices in `Rs.`.
   - **Invoices & Billing History:** Itemized procedure receipts, payment statuses, and discount records.
-- **Printable Medical Dossier Layout:** Print-ready `@media print` layout with official Ruqayya Clinic header and doctor verification/stamp blocks.
+- **Printable Medical Dossier Layout:** Print-ready `@media print` layout with official Ruqayya Medical Center header and doctor verification/stamp blocks.
 
 ### 4. Admin Executive Portal (`/admin`)
 - **Daily Cross-Portal Sales Reconciliation:**
@@ -74,7 +74,7 @@ An integrated, role-based Hospital & Pharmacy Management System built for seamle
     - **Pharmaceutical Dispensary Portal:** POS sales, medicines dispensed, 5% generic discounts, COGS, and pharmacy profit margin in Rs.
   - Visual revenue split bar showing percentage share (e.g., 65% Clinical vs 35% Pharmacy).
   - Print Daily Audit Sheet (`window.print()`) with official executive sign-off lines for Medical Incharge and Chief Pharmacist.
-  - One-click daily CSV export (`Ruqayya_clinic_daily_sales_reconciliation_YYYY-MM-DD.csv`).
+  - One-click daily CSV export (`Ruqayya_medical_center_daily_sales_reconciliation_YYYY-MM-DD.csv`).
 - **Financial & Operational Dashboard:**
   - Gross Revenue metrics split across Clinical Invoices and Pharmacy Sales in PKR.
   - Cost of Goods Sold (COGS) tracking and Pharmacy Net Profit calculation with percentage margin.
@@ -88,12 +88,12 @@ An integrated, role-based Hospital & Pharmacy Management System built for seamle
   - Date switcher for Daily Reconciliation reports.
   - **Live Summary Ribbon:** High-level overview cards displaying real-time counts and revenue totals for clinical encounters, invoices, POS sales, and inventory assets.
   - **One-Click CSV Downloads:**
-    - Daily Cross-Portal Reconciliation Report (`Ruqayya_clinic_daily_sales_reconciliation_YYYY-MM-DD.csv`)
-    - Visits Report (`Ruqayya_clinic_visits_YYYY-MM-DD.csv`)
-    - Clinical Invoices Report (`Ruqayya_clinic_invoices_YYYY-MM-DD.csv`)
-    - Pharmacy POS Sales Ledger (`Ruqayya_clinic_sales_YYYY-MM-DD.csv`)
-    - Medicine Batches & Valuations (`Ruqayya_clinic_inventory_YYYY-MM-DD.csv`)
-    - Security Audit Trail (`Ruqayya_clinic_audit_YYYY-MM-DD.csv`)
+    - Daily Cross-Portal Reconciliation Report (`Ruqayya_medical_center_daily_sales_reconciliation_YYYY-MM-DD.csv`)
+    - Visits Report (`Ruqayya_medical_center_visits_YYYY-MM-DD.csv`)
+    - Clinical Invoices Report (`Ruqayya_medical_center_invoices_YYYY-MM-DD.csv`)
+    - Pharmacy POS Sales Ledger (`Ruqayya_medical_center_sales_YYYY-MM-DD.csv`)
+    - Medicine Batches & Valuations (`Ruqayya_medical_center_inventory_YYYY-MM-DD.csv`)
+    - Security Audit Trail (`Ruqayya_medical_center_audit_YYYY-MM-DD.csv`)
 - **Immutable Audit Log Viewer:**
   - Comprehensive, tamper-evident security audit trail tracking staff logins, patient enrollments, invoices, POS transactions, and approval decisions.
 

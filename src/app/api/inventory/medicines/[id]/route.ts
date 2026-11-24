@@ -36,7 +36,23 @@ export async function PUT(
       batchNo,
       expiryDate,
       isCredit,
+      quantity,
+      qtyPurchased: bodyQtyPurchased,
     } = body;
+
+    // Check for explicit quantity update
+    let explicitQty: number | undefined = undefined;
+    const rawQtyInput = quantity !== undefined ? quantity : bodyQtyPurchased;
+    if (rawQtyInput !== undefined && rawQtyInput !== null && rawQtyInput !== "") {
+      const parsedQty = Number(rawQtyInput);
+      if (isNaN(parsedQty) || !Number.isInteger(parsedQty) || parsedQty < 0) {
+        return NextResponse.json(
+          { error: "Quantity (QTY) must be a valid non-negative integer (0 or greater)." },
+          { status: 400 }
+        );
+      }
+      explicitQty = parsedQty;
+    }
 
     const parsedPkg = pkgPacks !== undefined ? Math.max(1, parseInt(pkgPacks) || 1) : existing.pkgPacks;
     const parsedNos = nosPerPack !== undefined ? Math.max(1, parseInt(nosPerPack) || 1) : existing.nosPerPack;
@@ -44,8 +60,8 @@ export async function PUT(
     const parsedPerUnitSelling =
       perUnitSelling !== undefined ? Math.max(0, parseFloat(perUnitSelling) || 0) : existing.perUnitSelling;
 
-    // Derived auto-calculations matching purchase sheet
-    const qtyPurchased = parsedPkg * parsedNos;
+    // Derived auto-calculations matching purchase sheet or explicit quantity
+    const qtyPurchased = explicitQty !== undefined ? explicitQty : parsedPkg * parsedNos;
     const totalCost = Number((parsedPkg * parsedPerPackCost).toFixed(2));
     const perUnitCost = Number((parsedPerPackCost / parsedNos).toFixed(2));
     const totalValue = Number((qtyPurchased * parsedPerUnitSelling).toFixed(2));
@@ -70,6 +86,43 @@ export async function PUT(
         threshold: body.threshold !== undefined ? parseInt(body.threshold, 10) : existing.threshold,
       },
     });
+
+    // Synchronize to POS Medicine and StockBatch
+    const matchingMed = await prisma.medicine.findFirst({
+      where: { name: { equals: updated.itemName, mode: "insensitive" } },
+      include: {
+        batches: {
+          where: { approvalStatus: "APPROVED" },
+          orderBy: [{ quantity: "desc" }, { createdAt: "desc" }],
+        },
+      },
+    });
+
+    if (matchingMed) {
+      if (matchingMed.batches.length > 0) {
+        await prisma.stockBatch.update({
+          where: { id: matchingMed.batches[0].id },
+          data: {
+            quantity: updated.qtyPurchased,
+            sellingPrice: updated.perUnitSelling,
+            purchasePrice: updated.perUnitCost,
+          },
+        });
+      } else {
+        await prisma.stockBatch.create({
+          data: {
+            medicineId: matchingMed.id,
+            batchNumber: updated.batchNo || `BATCH-${Date.now().toString().slice(-4)}`,
+            quantity: updated.qtyPurchased,
+            purchasePrice: updated.perUnitCost,
+            sellingPrice: updated.perUnitSelling,
+            mfgDate: new Date(),
+            expiryDate: new Date(updated.expiryDate),
+            approvalStatus: "APPROVED",
+          },
+        });
+      }
+    }
 
     await recordAuditLog({
       userId: session.user.id,

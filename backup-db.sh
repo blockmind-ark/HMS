@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-#      Ruqayya Clinic & Pharmacy Management System (HMS)
+#      Ruqayya Medical Center & Pharmacy Management System (HMS)
 #       Date-Wise Production Database Backup Script (Linux / macOS)
 # ==============================================================================
 

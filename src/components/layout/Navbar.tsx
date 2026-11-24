@@ -76,7 +76,7 @@ export function Navbar() {
                 <Building2 className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
-                <span className="text-base font-extrabold tracking-tight">Ruqayya Clinic</span>
+                <span className="text-base font-extrabold tracking-tight">Ruqayya Medical Center</span>
                 <span className="text-[10px] tracking-wider uppercase text-slate-500 font-semibold -mt-1">
                   & Pharmacy
                 </span>

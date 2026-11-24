@@ -1,5 +1,5 @@
 /**
- * Ruqayya Clinic & Pharmacy - Local Hardware Biometric Scanner Daemon
+ * Ruqayya Medical Center & Pharmacy - Local Hardware Biometric Scanner Daemon
  * Bridges physical laptop fingerprint sensors (Elan MOC) & USB optical scanners (NITGEN HFDU06M)
  * to the web portal on http://127.0.0.1:9099
  */
@@ -319,7 +319,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200);
     res.end(JSON.stringify({
       status: "ONLINE",
-      service: "Ruqayya Clinic Biometric Hardware Daemon",
+      service: "Ruqayya Medical Center Biometric Hardware Daemon",
       version: "1.0.0",
       device: hw.model,
       connected: hw.connected,

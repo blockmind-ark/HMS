@@ -19,7 +19,9 @@ import {
   ArrowUpDown,
   Building2,
   Package,
+  Upload,
 } from "lucide-react";
+import { MedicineCsvImportModal } from "../admin/MedicineCsvImportModal";
 
 export interface MedicineInventoryItem {
   id: string;
@@ -72,6 +74,7 @@ export function MedicinePurchaseSheetView({
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MedicineInventoryItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -298,7 +301,7 @@ export function MedicinePurchaseSheetView({
               Complete Formulary · 289 Items
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Ruqayya Clinic Pharmacy &amp; Hospital Stock Sheet
+              Ruqayya Medical Center Pharmacy &amp; Hospital Stock Sheet
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -319,6 +322,16 @@ export function MedicinePurchaseSheetView({
           >
             <Download className="w-4 h-4 text-slate-600" />
             <span>Export CSV Sheet</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors shadow-sm"
+            title="Upload and Import Medicine CSV with Pre-Validation"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Upload &amp; Import CSV</span>
           </button>
 
           <button
@@ -1344,6 +1357,16 @@ export function MedicinePurchaseSheetView({
           </div>
         </div>
       )}
+
+      {/* CSV Import Modal with Pre-Validation */}
+      <MedicineCsvImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
+          fetchMedicines();
+        }}
+      />
     </div>
   );
 }

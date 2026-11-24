@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { type, manualNum, patientId, services, fee } = body;
+    const { type, manualNum, patientId, services, fee, doctorId } = body;
+
+    // Strict system-controlled token date enforcement:
+    // Client-side date or timestamp overrides are strictly disallowed and ignored.
+    // The server assigns the current operational system date via getTodayDateStr().
 
     if (type !== "AUTO" && type !== "MANUAL") {
       return NextResponse.json(
@@ -39,13 +43,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let finalDoctorId = doctorId;
+    if (!finalDoctorId) {
+      const defaultDoc = await prisma.doctor.findFirst({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+      });
+      if (defaultDoc) {
+        finalDoctorId = defaultDoc.id;
+      }
+    }
+
     const token = await generateOpdToken(
       session.user.id,
       type,
       type === "MANUAL" ? Number(manualNum) : undefined,
       patientId,
       services,
-      fee
+      fee,
+      finalDoctorId
     );
 
     const updatedStatus = await getTodayTokenStatus();

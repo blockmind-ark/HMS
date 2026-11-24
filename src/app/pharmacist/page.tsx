@@ -205,6 +205,12 @@ export default function PharmacistPortal() {
   };
 
   // Other Services & Invoicing Tab State
+  const [ultrasoundServices, setUltrasoundServices] = useState<{
+    id?: string;
+    name: string;
+    fee: number;
+    type: string;
+  }[]>(SERVICE_PRESETS);
   const [selectedService, setSelectedService] = useState<{
     name: string;
     fee: number;
@@ -477,10 +483,35 @@ export default function PharmacistPortal() {
     }
   };
 
+  const fetchUltrasoundServices = async () => {
+    try {
+      const res = await fetch("/api/services/ultrasound");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.services && data.services.length > 0) {
+          const mapped = data.services.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            fee: Number(s.price),
+            type: "Ultrasound",
+          }));
+          setUltrasoundServices(mapped);
+          setSelectedService((prev) => {
+            const match = mapped.find((m: any) => m.name === prev.name);
+            return match || mapped[0] || prev;
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load ultrasound services in Pharmacist:", e);
+    }
+  };
+
   useEffect(() => {
     fetchMedicines();
     fetchDailyStats();
     fetchTodayTokens();
+    fetchUltrasoundServices();
   }, [searchQuery, selectedCategory, activeItemType, filterLowStockOnly]);
 
   useEffect(() => {
@@ -488,6 +519,9 @@ export default function PharmacistPortal() {
       fetchBatches();
     } else if (activeTab === "pos") {
       fetchTodayTokens();
+    } else if (activeTab === "services") {
+      fetchTodayTokens();
+      fetchUltrasoundServices();
     }
   }, [activeTab]);
 
@@ -2321,30 +2355,15 @@ export default function PharmacistPortal() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
-                    {[
-                      {
-                        name: "Ultrasound Abdomen",
-                        fee: 700,
-                        tag: "Abdomen",
-                      },
-                      {
-                        name: "Ultrasound TVS",
-                        fee: 1200,
-                        tag: "TVS",
-                      },
-                      {
-                        name: "Ultrasound Liver, Kidney & Stomach",
-                        fee: 1200,
-                        tag: "L / K / S",
-                      },
-                    ].map((us) => {
+                    {ultrasoundServices.map((us) => {
                       const isSelected = selectedService.name === us.name;
+                      const tag = us.name.replace(/^Ultrasound\s+/i, "") || "Scan";
                       return (
                         <button
                           key={us.name}
                           type="button"
                           onClick={() => {
-                            const match = SERVICE_PRESETS.find((s) => s.name === us.name) || {
+                            const match = ultrasoundServices.find((s) => s.name === us.name) || {
                               name: us.name,
                               fee: us.fee,
                               type: "Ultrasound",
@@ -2366,7 +2385,7 @@ export default function PharmacistPortal() {
                                     : "bg-amber-100 text-amber-900 border border-amber-200"
                                 }`}
                               >
-                                {us.tag}
+                                {tag}
                               </span>
                               {isSelected && (
                                 <span className="text-[10px] font-black bg-white text-amber-700 px-1.5 py-0.2 rounded">

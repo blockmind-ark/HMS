@@ -24,6 +24,7 @@ import {
   Minimize2,
   ChevronDown,
   ChevronUp,
+  Stethoscope,
 } from "lucide-react";
 import {
   validateAllPatientFields,
@@ -55,6 +56,12 @@ export interface TokenItem {
   dateStr: string;
   fee?: number;
   services?: OpdServiceOption[];
+  doctorId?: string | null;
+  doctor?: {
+    id: string;
+    name: string;
+    specialization: string;
+  } | null;
   createdAt: string | Date;
   issuedBy: {
     id: string;
@@ -85,6 +92,7 @@ export interface TokenStatusResponse {
     manualCount: number;
   };
   recentTokens: TokenItem[];
+  tokenServices?: OpdServiceOption[];
 }
 
 // 80mm ESC/POS Single-Page Thermal Print Routine for OPD Token Slip (with Patient Details & Services)
@@ -93,6 +101,8 @@ export function printTokenSlip(token: {
   tokenType: "MANUAL_RESERVED" | "AUTO_SEQUENCE";
   createdAt: string | Date;
   staffName?: string;
+  doctorName?: string;
+  doctorSpecialization?: string;
   patientName?: string;
   patientUid?: string;
   patientPhone?: string;
@@ -280,7 +290,7 @@ export function printTokenSlip(token: {
       </head>
       <body>
         <div class="token-slip">
-          <div class="hospital-name">RUQAYYA CLINIC &amp; OPD</div>
+          <div class="hospital-name">RUQAYYA MEDICAL CENTER &amp; OPD</div>
           <div class="hospital-sub">Main Boulevard, G.T. Road, Lahore · Tel: 042-35891122</div>
           <div class="divider"></div>
           
@@ -319,6 +329,20 @@ export function printTokenSlip(token: {
               <span style="font-family:monospace;">${token.patientCnic}</span>
             </div>` : ""}
           </div>
+
+          <!-- Doctor Assignment Section -->
+          ${token.doctorName ? `
+          <div class="patient-box" style="margin-top: 5px; border-left: 2.5px solid #000; padding-left: 6px; background-color: #fcfcfc;">
+            <div class="meta-row">
+              <span class="meta-label">Consulting Doctor:</span>
+              <span style="font-weight:bold; font-size: 11px;">${token.doctorName}</span>
+            </div>
+            ${token.doctorSpecialization ? `
+            <div class="meta-row" style="font-size: 8.5px; margin-top: 1px;">
+              <span class="meta-label">Specialty:</span>
+              <span>${token.doctorSpecialization}</span>
+            </div>` : ""}
+          </div>` : ""}
 
           <!-- Services & Fees Breakdown -->
           <div style="margin: 6px 0; padding: 6px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000;">
@@ -359,7 +383,7 @@ export function printTokenSlip(token: {
           <div class="divider"></div>
 
           <div class="meta-row">
-            <span class="meta-label">Date &amp; Time:</span>
+            <span class="meta-label">Date &amp; Time (System):</span>
             <span>${formattedDate}</span>
           </div>
           <div class="meta-row">
@@ -382,7 +406,7 @@ export function printTokenSlip(token: {
           </div>
 
           <div class="footer-note">
-            Ruqayya Clinic HMS · Auto Token Queue System
+            Ruqayya Medical Center HMS · Auto Token Queue System
             <br />
             Keep this slip until consultation is complete.
           </div>
@@ -427,6 +451,10 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
   const [searchingPatient, setSearchingPatient] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
 
+  // Active Doctors List & Selection State (Mandatory)
+  const [doctorsList, setDoctorsList] = useState<{ id: string; name: string; specialization: string }[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+
   // Quick Register Patient Modal State
   const [showRegModal, setShowRegModal] = useState(false);
   const [regForm, setRegForm] = useState({
@@ -449,6 +477,16 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
   // OPD Services & Fees Selection inside "OPD Token Issued" modal (Default: OPD Fees Rs. 300)
   const [modalServiceIds, setModalServiceIds] = useState<string[]>(["opd"]);
 
+  // Live database-backed token services from server
+  const activeServiceOptions: OpdServiceOption[] =
+    data?.tokenServices && data.tokenServices.length > 0
+      ? data.tokenServices.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          fee: Number(t.fee),
+        }))
+      : OPD_SERVICE_OPTIONS;
+
   const toggleModalService = async (id: string) => {
     const updatedIds = modalServiceIds.includes(id)
       ? modalServiceIds.length > 1
@@ -458,7 +496,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
 
     setModalServiceIds(updatedIds);
 
-    const updatedServices = OPD_SERVICE_OPTIONS.filter((o) => updatedIds.includes(o.id));
+    const updatedServices = activeServiceOptions.filter((o) => updatedIds.includes(o.id));
     const updatedTotal = updatedServices.reduce((sum, s) => sum + s.fee, 0);
 
     if (lastIssuedToken?.id) {
@@ -490,7 +528,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
   };
 
   const getSelectedServicesList = (ids: string[] = modalServiceIds): OpdServiceOption[] => {
-    return OPD_SERVICE_OPTIONS.filter((o) => ids.includes(o.id));
+    return activeServiceOptions.filter((o) => ids.includes(o.id));
   };
 
   const getTotalFee = (ids: string[] = modalServiceIds): number => {
@@ -508,6 +546,22 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
       }
     } catch (e) {
       console.error("Failed to load recent patients:", e);
+    }
+  }, []);
+
+  const fetchDoctors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/doctors");
+      if (res.ok) {
+        const json = await res.json();
+        const docs = json.doctors || [];
+        setDoctorsList(docs);
+        if (docs.length > 0) {
+          setSelectedDoctorId((prev) => prev || docs[0].id);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load active doctors:", e);
     }
   }, []);
 
@@ -532,9 +586,10 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
   useEffect(() => {
     fetchStatus();
     fetchRecentPatients();
+    fetchDoctors();
     const interval = setInterval(fetchStatus, 15000);
     return () => clearInterval(interval);
-  }, [fetchStatus, fetchRecentPatients]);
+  }, [fetchStatus, fetchRecentPatients, fetchDoctors]);
 
   // Patient Lookup Function
   const handleSearchPatient = async (q: string) => {
@@ -596,13 +651,19 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
       return;
     }
 
+    if (!selectedDoctorId) {
+      setError("Please select a consulting doctor from the dropdown before generating an OPD token.");
+      return;
+    }
+
     setGenerating(true);
     setError(null);
 
-    // Default to OPD Consultation Fee Rs. 300
-    const defaultServices = OPD_SERVICE_OPTIONS.filter((o) => o.id === "opd");
-    const defaultFee = 300;
-    setModalServiceIds(["opd"]);
+    // Default to the primary database-configured token service (e.g. OPD Fees)
+    const primaryService = activeServiceOptions[0] || { id: "opd", name: "OPD Fees", fee: 300 };
+    const defaultServices = [primaryService];
+    const defaultFee = primaryService.fee;
+    setModalServiceIds([primaryService.id]);
 
     try {
       const res = await fetch("/api/receptionist/tokens", {
@@ -612,6 +673,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
           type,
           manualNum,
           patientId: selectedPatient?.id || undefined,
+          doctorId: selectedDoctorId || undefined,
           services: defaultServices,
           fee: defaultFee,
         }),
@@ -904,7 +966,15 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
             </p>
           </div>
 
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* System Date Badge (Read-Only) */}
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-slate-500 font-medium">System Date:</span>
+              <span className="font-mono font-bold text-slate-800">{data?.dateStr || new Date().toISOString().split("T")[0]}</span>
+              <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Read-Only</span>
+            </div>
+
             {selectedPatient ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -928,6 +998,56 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
             </span>
           </div>
         )}
+
+        {/* Doctor Selection Dropdown (Mandatory for Token) */}
+        <div className={`p-4 rounded-2xl border mb-4 transition-all ${
+          selectedDoctorId
+            ? "bg-indigo-50/70 border-indigo-200/90"
+            : "bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/20"
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm">
+                <Stethoscope className="w-4 h-4" />
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <span>Assign Consulting Doctor *</span>
+                  <span className="text-[10px] font-bold text-rose-600">(Required)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Select the consultant examining this patient today
+                </p>
+              </div>
+            </div>
+
+            {selectedDoctorId ? (
+              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 self-start sm:self-auto flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>Doctor Assigned</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300 self-start sm:self-auto flex items-center gap-1 animate-pulse">
+                <AlertCircle className="w-3 h-3 text-amber-600" />
+                <span>Selection Required</span>
+              </span>
+            )}
+          </div>
+
+          <select
+            value={selectedDoctorId}
+            onChange={(e) => setSelectedDoctorId(e.target.value)}
+            disabled={!selectedPatient}
+            className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-bold text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+          >
+            <option value="">-- Click to choose Consulting Doctor --</option>
+            {doctorsList.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.name} · {doc.specialization}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Section A: 4 Manual Reserved Token Buttons (Slots 1-4) */}
@@ -1274,7 +1394,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {OPD_SERVICE_OPTIONS.map((opt) => {
+                  {activeServiceOptions.map((opt) => {
                     const isChecked = modalServiceIds.includes(opt.id);
                     return (
                       <button
@@ -1302,7 +1422,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
 
                 {/* Itemized Fees Summary */}
                 <div className="mt-3 pt-2.5 border-t border-white/10 text-[11px] space-y-1">
-                  {OPD_SERVICE_OPTIONS.filter((o) => modalServiceIds.includes(o.id)).map((s) => (
+                  {activeServiceOptions.filter((o) => modalServiceIds.includes(o.id)).map((s) => (
                     <div key={s.id} className="flex justify-between text-slate-300">
                       <span>• {s.name}</span>
                       <span className="font-mono font-bold text-white">Rs. {s.fee}</span>
@@ -1316,6 +1436,24 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
               </div>
 
               <div className="text-[11px] text-slate-300 space-y-1 pt-1">
+                {lastIssuedToken.doctor && (
+                  <div>
+                    <span className="text-slate-400">Doctor: </span>
+                    <span className="font-semibold text-emerald-300">
+                      {lastIssuedToken.doctor.name}
+                    </span>
+                    <span className="text-slate-400 text-[10px] ml-1">
+                      ({lastIssuedToken.doctor.specialization})
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-400">Date (System): </span>
+                  <span className="font-mono font-semibold text-white">
+                    {lastIssuedToken.dateStr || new Date().toISOString().split("T")[0]}
+                  </span>
+                  <span className="ml-1.5 text-[9px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Read-Only</span>
+                </div>
                 <div>
                   <span className="text-slate-400">Issued By: </span>
                   <span className="font-semibold text-white">
@@ -1356,11 +1494,13 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
                       tokenType: lastIssuedToken.tokenType,
                       createdAt: lastIssuedToken.createdAt,
                       staffName: lastIssuedToken.issuedBy?.name,
+                      doctorName: lastIssuedToken.doctor?.name,
+                      doctorSpecialization: lastIssuedToken.doctor?.specialization,
                       patientName: lastIssuedToken.patient?.name,
                       patientUid: lastIssuedToken.patient?.patientUid,
                       patientPhone: lastIssuedToken.patient?.phone,
                       patientCnic: lastIssuedToken.patient?.cnic,
-                      services: OPD_SERVICE_OPTIONS.filter((o) => modalServiceIds.includes(o.id)),
+                      services: activeServiceOptions.filter((o) => modalServiceIds.includes(o.id)),
                       totalFee: modalTotalFee,
                     })
                   }
@@ -1431,7 +1571,7 @@ export function OpdTokenGenerationView({ onSelectTokenForServices }: OpdTokenGen
                 <input
                   type="tel"
                   required
-                  placeholder="0300-1234567"
+                  placeholder="0300-1234567, 0370-1234567"
                   value={regForm.phone}
                   onChange={(e) => {
                     setRegForm((p) => ({ ...p, phone: e.target.value }));

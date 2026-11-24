@@ -53,11 +53,11 @@ async function verifyWebAuthnBiometrics() {
       patientId: "test-patient-id",
       patientUid: "PAT-2026-0001",
       patientName: "Kamran Akram",
-      rpName: "Ruqayya Clinic & Pharmacy",
+      rpName: "Ruqayya Medical Center & Pharmacy",
     });
 
     assert(
-      regOptions.rp.name === "Ruqayya Clinic & Pharmacy",
+      regOptions.rp.name === "Ruqayya Medical Center & Pharmacy",
       "Registration Options RP Name Branding",
       regOptions.rp.name
     );

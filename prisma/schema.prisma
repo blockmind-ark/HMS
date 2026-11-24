@@ -85,6 +85,7 @@ model User {
   expenditures              Expenditure[]
   vendorPayments            VendorPayment[]
   tokenLogs                 DailyTokenLog[]          @relation("UserTokenLogs")
+  doctor                    Doctor?
 }
 
 model Patient {
@@ -115,11 +116,15 @@ model Visit {
   token       DailyTokenLog? @relation(fields: [tokenId], references: [id])
   serviceType String   // e.g. "OPD", "Ultrasound", "Consultation"
   fee         Float
+  doctorId    String?
+  doctor      Doctor?  @relation(fields: [doctorId], references: [id])
   notes       String?  // Doctor's clinical notes & findings
   diagnosis   String?  // Clinical diagnosis / impression
   createdAt   DateTime @default(now())
   
   invoice     Invoice?
+
+  @@index([doctorId])
 }
 
 model Invoice {
@@ -453,6 +458,8 @@ model DailyTokenLog {
   issuedBy    User        @relation("UserTokenLogs", fields: [issuedById], references: [id])
   patientId   String?
   patient     Patient?    @relation(fields: [patientId], references: [id])
+  doctorId    String?
+  doctor      Doctor?     @relation(fields: [doctorId], references: [id])
   fee         Float       @default(300)
   services    Json?
   visits      Visit[]
@@ -463,6 +470,7 @@ model DailyTokenLog {
   @@index([tokenNumber])
   @@index([status])
   @@index([patientId])
+  @@index([doctorId])
 }
 
 model DailyTokenCounter {
@@ -475,3 +483,110 @@ model DailyTokenCounter {
 
   @@index([dateStr])
 }
+
+model UltrasoundService {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  price     Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model TokenService {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  fee       Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model Doctor {
+  id              String             @id @default(cuid())
+  userId          String?            @unique
+  user            User?              @relation(fields: [userId], references: [id])
+  name            String
+  specialization  String
+  phone           String?
+  email           String?
+  baseSalary      Float              @default(0) // Base pay / salary in PKR
+  payType         String             @default("MONTHLY") // "MONTHLY" | "PER_PATIENT" | "DAILY"
+  perPatientShare Float              @default(0) // Optional share per consultation in PKR
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  tokenLogs       DailyTokenLog[]
+  visits          Visit[]
+  attendances     DoctorAttendance[]
+  leaves          DoctorLeave[]
+  payrolls        DoctorPayroll[]
+
+  @@index([name])
+  @@index([specialization])
+  @@index([isActive])
+}
+
+model DoctorAttendance {
+  id           String   @id @default(cuid())
+  doctorId     String
+  doctor       Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  dateStr      String   // Format YYYY-MM-DD
+  status       String   @default("PRESENT") // "PRESENT" | "ABSENT" | "LEAVE" | "HALF_DAY"
+  checkInTime  String?  // e.g. "09:00 AM"
+  checkOutTime String?  // e.g. "05:00 PM"
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([doctorId, dateStr])
+  @@index([doctorId])
+  @@index([dateStr])
+  @@index([status])
+}
+
+model DoctorLeave {
+  id        String   @id @default(cuid())
+  doctorId  String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  reason    String
+  status    String   @default("APPROVED") // "PENDING" | "APPROVED" | "REJECTED"
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorId])
+  @@index([status])
+}
+
+model DoctorPayroll {
+  id          String   @id @default(cuid())
+  doctorId    String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  month       Int      // 1 - 12
+  year        Int      // e.g. 2026
+  basePay     Float    @default(0)
+  workingDays Int      @default(0)
+  totalVisits Int      @default(0)
+  bonuses     Float    @default(0)
+  deductions  Float    @default(0)
+  netPay      Float    @default(0)
+  status      String   @default("DRAFT") // "DRAFT" | "PAID"
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([doctorId, year, month])
+  @@index([doctorId])
+  @@index([year, month])
+}
+

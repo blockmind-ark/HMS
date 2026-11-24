@@ -42,7 +42,7 @@ export function createRegistrationOptions(params: {
   rpName?: string;
   rpId?: string;
 }) {
-  const { challenge, patientId, patientUid, patientName, rpName = "Ruqayya Clinic", rpId } = params;
+  const { challenge, patientId, patientUid, patientName, rpName = "Ruqayya Medical Center", rpId } = params;
 
   // Base64URL encoded user ID
   const userIdBase64 = Buffer.from(patientId).toString("base64url");

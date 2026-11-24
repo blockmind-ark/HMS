@@ -31,6 +31,12 @@ export interface GeneratedTokenResult {
     gender?: string;
     cnic?: string | null;
   } | null;
+  doctorId?: string | null;
+  doctor?: {
+    id: string;
+    name: string;
+    specialization: string;
+  } | null;
 }
 
 export async function generateOpdToken(
@@ -39,7 +45,8 @@ export async function generateOpdToken(
   manualNum?: number,
   patientId?: string,
   services?: { id: string; name: string; fee: number }[],
-  fee?: number
+  fee?: number,
+  doctorId?: string
 ): Promise<GeneratedTokenResult> {
   const dateStr = getTodayDateStr();
 
@@ -126,17 +133,24 @@ export async function generateOpdToken(
       });
     }
 
-    // 3. Record in DailyTokenLog
+    // 3. Record in DailyTokenLog with database-backed services and fees
+    let finalServices = services && services.length > 0 ? services : null;
+    if (!finalServices) {
+      const activeOpd = await tx.tokenService.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (activeOpd) {
+        finalServices = [{ id: activeOpd.id, name: activeOpd.name, fee: activeOpd.fee }];
+      } else {
+        finalServices = [{ id: "opd", name: "OPD Fees", fee: 300 }];
+      }
+    }
+
     const calculatedFee =
       fee !== undefined
         ? fee
-        : services && services.length > 0
-        ? services.reduce((acc, s) => acc + s.fee, 0)
-        : 300;
-    const finalServices =
-      services && services.length > 0
-        ? services
-        : [{ id: "opd", name: "OPD Fees", fee: 300 }];
+        : finalServices.reduce((acc, s: any) => acc + (Number(s.fee) || 0), 0);
 
     const log = await tx.dailyTokenLog.create({
       data: {
@@ -146,6 +160,7 @@ export async function generateOpdToken(
         status: "ISSUED",
         issuedById: userId,
         patientId: patientId || null,
+        doctorId: doctorId || null,
         fee: calculatedFee,
         services: finalServices,
       },
@@ -155,6 +170,13 @@ export async function generateOpdToken(
             id: true,
             name: true,
             role: true,
+          },
+        },
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            specialization: true,
           },
         },
         patient: {
@@ -201,7 +223,7 @@ export async function getTodayTokenStatus() {
     }
   }
 
-  const [recentLogs, totalCount, autoCount, manualCount] = await Promise.all([
+  const [recentLogs, totalCount, autoCount, manualCount, activeTokenServices] = await Promise.all([
     prisma.dailyTokenLog.findMany({
       where: { dateStr, status: "ISSUED" },
       orderBy: { createdAt: "desc" },
@@ -212,6 +234,13 @@ export async function getTodayTokenStatus() {
             id: true,
             name: true,
             role: true,
+          },
+        },
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            specialization: true,
           },
         },
         patient: {
@@ -236,6 +265,10 @@ export async function getTodayTokenStatus() {
     prisma.dailyTokenLog.count({
       where: { dateStr, status: "ISSUED", tokenType: "MANUAL_RESERVED" },
     }),
+    prisma.tokenService.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   return {
@@ -251,5 +284,6 @@ export async function getTodayTokenStatus() {
       manualCount,
     },
     recentTokens: recentLogs,
+    tokenServices: activeTokenServices,
   };
 }

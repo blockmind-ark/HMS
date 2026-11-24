@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 async function resetProductionDatabase() {
   console.log("================================================================================");
-  console.log("     Ruqayya Clinic & Pharmacy - Production Operational Database Reset          ");
+  console.log("     Ruqayya Medical Center & Pharmacy - Production Operational Database Reset          ");
   console.log("================================================================================");
   console.log("\n[1/5] Purging all operational/transactional records...");
 

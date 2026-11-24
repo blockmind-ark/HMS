@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
     where: andConditions.length > 0 ? { AND: andConditions } : {},
     include: {
       batches: {
-        where: { approvalStatus: "APPROVED", quantity: { gt: 0 } },
-        orderBy: { expiryDate: "asc" },
+        where: { approvalStatus: "APPROVED" },
+        orderBy: [{ quantity: "desc" }, { expiryDate: "asc" }],
       },
     },
     orderBy: { name: "asc" },

@@ -20,7 +20,8 @@ export async function PATCH(
       where: { id },
       include: {
         batches: {
-          where: { approvalStatus: "APPROVED", quantity: { gt: 0 } },
+          where: { approvalStatus: "APPROVED" },
+          orderBy: [{ quantity: "desc" }, { createdAt: "desc" }],
         },
       },
     });
@@ -30,7 +31,20 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { perOff, sellingPrice, purchasePrice, threshold } = body;
+    const { perOff, sellingPrice, purchasePrice, threshold, quantity } = body;
+
+    // Validate Quantity if provided
+    let parsedQuantity: number | undefined = undefined;
+    if (quantity !== undefined && quantity !== null && quantity !== "") {
+      const numQty = Number(quantity);
+      if (isNaN(numQty) || !Number.isInteger(numQty) || numQty < 0) {
+        return NextResponse.json(
+          { error: "Quantity (QTY) must be a valid non-negative integer (0 or greater)." },
+          { status: 400 }
+        );
+      }
+      parsedQuantity = numQty;
+    }
 
     const medUpdateData: any = {};
 
@@ -53,7 +67,7 @@ export async function PATCH(
       data: medUpdateData,
     });
 
-    // If sellingPrice or purchasePrice or perOff was specified, update active batches as well
+    // If sellingPrice or purchasePrice or perOff was specified, prepare batch updates
     const batchUpdates: any = {};
     if (sellingPrice !== undefined && sellingPrice !== null && sellingPrice !== "") {
       const sp = parseFloat(String(sellingPrice));
@@ -67,20 +81,75 @@ export async function PATCH(
       batchUpdates.perOff = medUpdateData.perOff;
     }
 
-    if (Object.keys(batchUpdates).length > 0 && medicine.batches.length > 0) {
-      await prisma.stockBatch.updateMany({
-        where: {
+    // Apply batch updates
+    if (medicine.batches.length > 0) {
+      if (Object.keys(batchUpdates).length > 0) {
+        await prisma.stockBatch.updateMany({
+          where: {
+            medicineId: id,
+            approvalStatus: "APPROVED",
+          },
+          data: batchUpdates,
+        });
+      }
+
+      // If quantity is explicitly modified, set primary batch to parsedQuantity
+      // and reset any auxiliary batches to 0 so totalStock equals parsedQuantity
+      if (parsedQuantity !== undefined) {
+        const primaryBatch = medicine.batches[0];
+        await prisma.stockBatch.update({
+          where: { id: primaryBatch.id },
+          data: { quantity: parsedQuantity },
+        });
+
+        if (medicine.batches.length > 1) {
+          const otherBatchIds = medicine.batches.slice(1).map((b) => b.id);
+          await prisma.stockBatch.updateMany({
+            where: { id: { in: otherBatchIds } },
+            data: { quantity: 0 },
+          });
+        }
+      }
+    } else if (parsedQuantity !== undefined || Object.keys(batchUpdates).length > 0) {
+      // If medicine has no batches yet, create a default approved batch
+      const effectiveSp = batchUpdates.sellingPrice ?? 0;
+      const effectivePp = batchUpdates.purchasePrice ?? 0;
+      const effectivePerOff = medUpdateData.perOff ?? medicine.perOff ?? 0;
+      const effectiveQty = parsedQuantity ?? 0;
+
+      await prisma.stockBatch.create({
+        data: {
           medicineId: id,
+          batchNumber: `BATCH-DIRECT-${Date.now().toString().slice(-4)}`,
+          quantity: effectiveQty,
+          purchasePrice: effectivePp,
+          sellingPrice: effectiveSp,
+          perOff: effectivePerOff,
+          mfgDate: new Date(),
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           approvalStatus: "APPROVED",
         },
-        data: batchUpdates,
       });
     }
 
+    // Synchronize matching MedicineInventory entry if present
+    await prisma.medicineInventory.updateMany({
+      where: { itemName: { equals: medicine.name, mode: "insensitive" } },
+      data: {
+        ...(parsedQuantity !== undefined ? { qtyPurchased: parsedQuantity } : {}),
+        ...(medUpdateData.threshold !== undefined ? { threshold: medUpdateData.threshold } : {}),
+        ...(batchUpdates.sellingPrice !== undefined ? { perUnitSelling: batchUpdates.sellingPrice } : {}),
+        ...(batchUpdates.purchasePrice !== undefined ? { perUnitCost: batchUpdates.purchasePrice } : {}),
+        ...(medUpdateData.perOff !== undefined ? { perOff: medUpdateData.perOff } : {}),
+      },
+    });
+
     await recordAuditLog({
       userId: session.user.id,
-      action: "MEDICINE_PRICING_UPDATED",
-      details: `Admin ${session.user.name} dynamically updated ${medicine.name}: perOff = ${
+      action: "MEDICINE_UPDATED",
+      details: `Admin ${session.user.name} updated medicine ${medicine.name}: quantity = ${
+        parsedQuantity !== undefined ? parsedQuantity + " units" : "unchanged"
+      }, perOff = ${
         medUpdateData.perOff !== undefined ? medUpdateData.perOff + "%" : "unchanged"
       }, threshold = ${medUpdateData.threshold ?? "unchanged"}, sellingPrice = ${
         batchUpdates.sellingPrice ?? "unchanged"
@@ -90,7 +159,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       medicine: updatedMedicine,
-      message: "Medicine pricing & per-off discount updated dynamically.",
+      message: "Medicine pricing, per-off discount, and stock quantity updated successfully.",
     });
   } catch (error: any) {
     console.error("Dynamic per-off update error:", error);

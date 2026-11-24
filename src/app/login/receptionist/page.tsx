@@ -198,7 +198,7 @@ export default function ReceptionistLoginPage() {
         </Suspense>
 
         <div className="mt-6 text-center text-xs text-blue-300/60">
-          Reception &amp; OPD Counter Terminal · Ruqayya Clinic
+          Reception &amp; OPD Counter Terminal · Ruqayya Medical Center
         </div>
       </div>
     </div>

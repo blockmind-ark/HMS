@@ -2,10 +2,10 @@
 REM ==============================================================================
 REM Hospital & Pharmacy Management System (HMS) - Windows Production Deployment
 REM ==============================================================================
-TITLE HMS Production Deployment - Ruqayya Clinic & Pharmacy
+TITLE HMS Production Deployment - Ruqayya Medical Center & Pharmacy
 
 echo ===============================================================================
-echo           Ruqayya Clinic & Pharmacy Management System (HMS)
+echo           Ruqayya Medical Center & Pharmacy Management System (HMS)
 echo                      Windows Production Deployment
 echo ===============================================================================
 echo.

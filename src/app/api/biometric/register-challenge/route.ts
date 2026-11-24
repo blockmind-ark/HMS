@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       patientId: patient?.id || "temp-patient-" + Date.now(),
       patientUid: patient?.patientUid || patientUid,
       patientName: patient?.name || patientName,
-      rpName: "Ruqayya Clinic & Pharmacy",
+      rpName: "Ruqayya Medical Center & Pharmacy",
       rpId,
     });
 

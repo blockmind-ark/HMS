@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================================
-::       Ruqayya Clinic & Pharmacy Management System (HMS)
+::       Ruqayya Medical Center & Pharmacy Management System (HMS)
 ::          Windows Daily Date-Wise Database Backup Script
 :: ============================================================================
 

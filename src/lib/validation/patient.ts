@@ -70,7 +70,7 @@ export function validatePatientName(name: string): string | null {
  * - Cannot start with spaces, letters, or invalid symbols.
  * - Standard 11-digit mobile: 03XX-XXXXXXX or 03XXXXXXXXX (starts with 03).
  * - Standard international: +923XXXXXXXXX or 923XXXXXXXXX.
- * - PTA mobile operator code must be between 0300 and 0359 (Jazz, Zong, Telenor, Ufone, SCOM).
+ * - PTA mobile operator code must be between 0300 and 0359 (Jazz, Zong, Telenor, Ufone, SCOM) or 0370/0371 (Onic).
  */
 export function validatePakistaniPhone(phone: string): string | null {
   if (!phone || phone.length === 0) {
@@ -107,8 +107,10 @@ export function validatePakistaniPhone(phone: string): string | null {
   // Operator code verification
   const prefix = digits.startsWith("03") ? digits.substring(0, 4) : "0" + digits.substring(2, 5);
   const pNum = parseInt(prefix, 10);
-  if (isNaN(pNum) || pNum < 300 || pNum > 359) {
-    return `Invalid Pakistani mobile network code (${prefix}). Must be between 0300 and 0359 (Jazz, Zong, Telenor, Ufone, SCOM).`;
+  const isValidOperator = (!isNaN(pNum) && pNum >= 300 && pNum <= 359) || prefix === "0370" || prefix === "0371";
+
+  if (!isValidOperator) {
+    return `Invalid Pakistani mobile network code (${prefix}). Must be between 0300-0359, 0370, or 0371.`;
   }
 
   return null;

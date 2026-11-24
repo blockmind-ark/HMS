@@ -166,7 +166,7 @@ function AdminLoginForm() {
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Department Portal Selector</span>
         </Link>
-        <span className="text-[11px] text-slate-400 font-mono">Ruqayya Clinic HMS</span>
+        <span className="text-[11px] text-slate-400 font-mono">Ruqayya Medical Center HMS</span>
       </div>
     </div>
   );

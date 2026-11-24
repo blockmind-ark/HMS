@@ -198,7 +198,7 @@ export default function PharmacistLoginPage() {
         </Suspense>
 
         <div className="mt-6 text-center text-xs text-amber-300/60">
-          Dispensary POS Counter · Ruqayya Clinic
+          Dispensary POS Counter · Ruqayya Medical Center
         </div>
       </div>
     </div>

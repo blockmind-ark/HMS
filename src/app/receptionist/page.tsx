@@ -146,6 +146,7 @@ export default function ReceptionistPortal() {
   };
 
   // Visit & Checkout Calculator State
+  const [ultrasoundServices, setUltrasoundServices] = useState<{ id?: string; name: string; fee: number; type: string }[]>(SERVICE_PRESETS);
   const [selectedService, setSelectedService] = useState(SERVICE_PRESETS[0]);
   const [customFee, setCustomFee] = useState<number>(SERVICE_PRESETS[0].fee);
   const [discount, setDiscount] = useState<number>(0);
@@ -224,10 +225,35 @@ export default function ReceptionistPortal() {
     }
   };
 
+  const fetchUltrasoundServices = async () => {
+    try {
+      const res = await fetch("/api/services/ultrasound");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.services && data.services.length > 0) {
+          const mapped = data.services.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            fee: Number(s.price),
+            type: "Ultrasound",
+          }));
+          setUltrasoundServices(mapped);
+          setSelectedService((prev) => {
+            const match = mapped.find((m: any) => m.name === prev.name);
+            return match || mapped[0] || prev;
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load ultrasound services in Receptionist:", e);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     searchPatients("");
     fetchTodayTokens();
+    fetchUltrasoundServices();
   }, []);
 
   // Find active token for selected patient or selected token
@@ -987,30 +1013,15 @@ export default function ReceptionistPortal() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
-                  {[
-                    {
-                      name: "Ultrasound Abdomen",
-                      fee: 700,
-                      tag: "Abdomen",
-                    },
-                    {
-                      name: "Ultrasound TVS",
-                      fee: 1200,
-                      tag: "TVS",
-                    },
-                    {
-                      name: "Ultrasound Liver, Kidney & Stomach",
-                      fee: 1200,
-                      tag: "L / K / S",
-                    },
-                  ].map((us) => {
+                  {ultrasoundServices.map((us) => {
                     const isSelected = selectedService.name === us.name;
+                    const tag = us.name.replace(/^Ultrasound\s+/i, "") || "Scan";
                     return (
                       <button
                         key={us.name}
                         type="button"
                         onClick={() => {
-                          const match = SERVICE_PRESETS.find((s) => s.name === us.name) || {
+                          const match = ultrasoundServices.find((s) => s.name === us.name) || {
                             name: us.name,
                             fee: us.fee,
                             type: "Ultrasound",
@@ -1028,7 +1039,7 @@ export default function ReceptionistPortal() {
                             <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
                               isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 border border-amber-200"
                             }`}>
-                              {us.tag}
+                              {tag}
                             </span>
                             {isSelected && (
                               <span className="text-[10px] font-black bg-white text-amber-700 px-1.5 py-0.2 rounded">
@@ -1502,7 +1513,7 @@ export default function ReceptionistPortal() {
                       </p>
                     ) : (
                       <p className="text-[10px] text-slate-400 mt-1">
-                        Constraint: Standard 11-digit mobile starting with 03 (e.g. 0300-1234567).
+                        Constraint: Standard 11-digit mobile starting with 03 (e.g. 0300-1234567, 0370-1234567).
                       </p>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 # NITGEN HFDU06M Fingerprint Scanner — Ubuntu Linux Integration Guide
 
-This guide details the technical setup, official vendor SDK requirements, udev permissions, service configuration, and troubleshooting steps for operating the **NITGEN HFDU06M / FDU06M/S** optical USB fingerprint scanner on Ubuntu Linux with the Ruqayya Clinic & Pharmacy Hospital Management System.
+This guide details the technical setup, official vendor SDK requirements, udev permissions, service configuration, and troubleshooting steps for operating the **NITGEN HFDU06M / FDU06M/S** optical USB fingerprint scanner on Ubuntu Linux with the Ruqayya Medical Center & Pharmacy Hospital Management System.
 
 ---
 
@@ -115,7 +115,7 @@ ldconfig -p | grep -i NBioBSP
 
 ## 5. Starting and Configuring the Local Biometric Daemon
 
-The Ruqayya Clinic Management System uses a hardened local loopback daemon (`services/biometric-daemon/scanner-daemon.js`) listening on `127.0.0.1:9099`.
+The Ruqayya Medical Center Management System uses a hardened local loopback daemon (`services/biometric-daemon/scanner-daemon.js`) listening on `127.0.0.1:9099`.
 
 ### Environment Configuration (`.env`)
 Ensure `.env` contains:
@@ -166,7 +166,7 @@ For unattended front-desk clinic deployment, install the daemon as a systemd ser
 ```bash
 sudo bash -c 'cat << "EOF" > /etc/systemd/system/Ruqayya-biometrics.service
 [Unit]
-Description=Ruqayya Clinic NITGEN Biometric Hardware Daemon
+Description=Ruqayya Medical Center NITGEN Biometric Hardware Daemon
 After=network.target
 
 [Service]

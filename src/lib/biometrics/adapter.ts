@@ -141,7 +141,7 @@ export class MockDevelopmentScannerAdapter implements IBiometricScannerAdapter {
   async getDeviceInfo(): Promise<ScannerDeviceInfo> {
     return {
       model: "Mock Dev Biometric Engine v1.0",
-      vendor: "Ruqayya Clinic Engineering (Mock / Development)",
+      vendor: "Ruqayya Medical Center Engineering (Mock / Development)",
       serialNumber: "DEV-MOCK-9999",
       driverVersion: "1.0.0-mock",
       isMock: true,

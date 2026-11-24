@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-# Ruqayya Clinic & Pharmacy - Hardware Biometric Scanner Daemon Launcher
+# Ruqayya Medical Center & Pharmacy - Hardware Biometric Scanner Daemon Launcher
 # Starts the local hardware scanner daemon on http://127.0.0.1:9099
 # Bridges Elan MOC laptop sensor & NITGen optical scanner to the web portal
 # =====================================================================

@@ -88,10 +88,20 @@ export async function POST(req: NextRequest) {
 
     // Transaction to create visit and linked invoice
     const result = await prisma.$transaction(async (tx) => {
+      let resolvedDoctorId = body.doctorId || null;
+      if (!resolvedDoctorId && tokenId) {
+        const linkedToken = await tx.dailyTokenLog.findUnique({
+          where: { id: tokenId },
+          select: { doctorId: true },
+        });
+        resolvedDoctorId = linkedToken?.doctorId || null;
+      }
+
       const visit = await tx.visit.create({
         data: {
           patientId,
           tokenId: tokenId || null,
+          doctorId: resolvedDoctorId,
           serviceType,
           fee: numericFee,
         },

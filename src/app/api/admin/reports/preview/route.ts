@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
           description: "Comprehensive record of OPD consultations, ultrasound diagnostics, and physician examinations.",
           reportType: "visits",
           exportUrl: search ? `/api/admin/export?type=visits&search=${encodeURIComponent(search)}` : "/api/admin/export?type=visits",
-          filename: `Ruqayya_clinic_visits_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `Ruqayya_medical_center_visits_${new Date().toISOString().split("T")[0]}.csv`,
           searchQuery: search || undefined,
         },
         summaryCards: [
@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
           description: "Audited ledger of sequential invoice numbers, receptionist cashiers, line items, and paid status.",
           reportType: "invoices",
           exportUrl: "/api/admin/export?type=invoices",
-          filename: `Ruqayya_clinic_invoices_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `Ruqayya_medical_center_invoices_${new Date().toISOString().split("T")[0]}.csv`,
         },
         summaryCards: [
           { label: "Total Invoices", value: totalCount.toString(), helper: `${paidCount} settled as PAID`, color: "emerald" },
@@ -282,7 +282,7 @@ export async function GET(req: NextRequest) {
           description: "Dispensary POS sales records, customer linkages, 5% generic discount deductions, and profit margins.",
           reportType: "sales",
           exportUrl: "/api/admin/export?type=sales",
-          filename: `Ruqayya_clinic_sales_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `Ruqayya_medical_center_sales_${new Date().toISOString().split("T")[0]}.csv`,
         },
         summaryCards: [
           { label: "Total POS Sales", value: totalCount.toString(), helper: `${totalUnits} units dispensed`, color: "amber" },
@@ -327,7 +327,7 @@ export async function GET(req: NextRequest) {
           description: "Inventory stock positions, batch numbers, acquisition costs, retail prices, and expiry monitoring.",
           reportType: "inventory",
           exportUrl: "/api/admin/export?type=inventory",
-          filename: `Ruqayya_clinic_inventory_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `Ruqayya_medical_center_inventory_${new Date().toISOString().split("T")[0]}.csv`,
         },
         summaryCards: [
           { label: "Total Batches", value: totalCount.toString(), helper: `${totalQuantity} total units in stock`, color: "blue" },
@@ -370,7 +370,7 @@ export async function GET(req: NextRequest) {
           description: "Cryptographically verifiable, non-repudiation security audit trail logging every administrative and clinical operation.",
           reportType: "audit",
           exportUrl: "/api/admin/export?type=audit",
-          filename: `Ruqayya_clinic_audit_${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `Ruqayya_medical_center_audit_${new Date().toISOString().split("T")[0]}.csv`,
         },
         summaryCards: [
           { label: "Total Audit Events", value: totalCount.toString(), helper: "Immutable security records", color: "purple" },
@@ -476,7 +476,7 @@ export async function GET(req: NextRequest) {
           description: `Daily financial comparative audit between Clinical Hospital and Pharmaceutical POS streams for ${targetDateStr}.`,
           reportType: "daily",
           exportUrl: `/api/admin/export?type=daily&date=${targetDateStr}`,
-          filename: `Ruqayya_clinic_daily_sales_reconciliation_${targetDateStr}.csv`,
+          filename: `Ruqayya_medical_center_daily_sales_reconciliation_${targetDateStr}.csv`,
         },
         summaryCards: [
           { label: "Net Combined Revenue", value: `Rs. ${combinedTotal.toFixed(2)}`, helper: `Gross: Rs. ${(clinNet + clinDisc + rxNet + rxDisc).toFixed(2)}`, color: "purple" },

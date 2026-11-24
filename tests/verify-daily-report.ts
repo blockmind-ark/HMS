@@ -111,7 +111,7 @@ async function verifyDailyReport() {
 
     // 4. Test Daily CSV Export Generation Logic
     let csvLines = [
-      "Ruqayya CLINIC & PHARMACY - DAILY SALES & RECONCILIATION AUDIT REPORT",
+      "Ruqayya MEDICAL CENTER & PHARMACY - DAILY SALES & RECONCILIATION AUDIT REPORT",
       `Report Date,"${todayStr}"`,
       "Stream,Count,Gross Total (Rs.),Discounts Given (Rs.),Net Cash Collected (Rs.),COGS (Rs.),Net Profit (Rs.)",
       `"Clinical Hospital Portal",${invoicesToday.length},"${(clinNet + clinDisc).toFixed(2)}","${clinDisc.toFixed(2)}","${clinNet.toFixed(2)}","0.00","${clinNet.toFixed(2)}"`,
@@ -120,7 +120,7 @@ async function verifyDailyReport() {
     ];
 
     const sampleCsv = csvLines.join("\n");
-    assert(sampleCsv.includes("Ruqayya CLINIC & PHARMACY - DAILY SALES"), "Daily Reconciliation CSV Header");
+    assert(sampleCsv.includes("Ruqayya MEDICAL CENTER & PHARMACY - DAILY SALES"), "Daily Reconciliation CSV Header");
     assert(sampleCsv.includes("Clinical Hospital Portal") && sampleCsv.includes("Pharmacy Dispensary Portal"), "Dual-Portal Reconciliation Content");
 
     console.log("\n=========================================================");

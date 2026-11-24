@@ -13,21 +13,49 @@ export async function GET(req: NextRequest) {
   const query = searchParams.get("query")?.trim() || "";
 
   try {
-    const whereClause: any = {};
+    let doctorIdFilter: string | undefined = undefined;
+    if (session.user.role === "DOCTOR") {
+      const doc = await prisma.doctor.findFirst({
+        where: {
+          OR: [
+            { userId: session.user.id },
+            { email: session.user.email },
+          ],
+        },
+      });
+      if (doc) {
+        doctorIdFilter = doc.id;
+      }
+    }
+
+    const andConditions: any[] = [];
 
     if (query) {
-      whereClause.OR = [
-        { name: { contains: query, mode: "insensitive" } },
-        { patientUid: { contains: query, mode: "insensitive" } },
-        { phone: { contains: query, mode: "insensitive" } },
-        { biometricHash: { contains: query, mode: "insensitive" } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { patientUid: { contains: query, mode: "insensitive" } },
+          { phone: { contains: query, mode: "insensitive" } },
+          { biometricHash: { contains: query, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    // Strict doctor scoping: if logged in as a DOCTOR, only show patients assigned to them via visits or tokens
+    if (doctorIdFilter) {
+      andConditions.push({
+        OR: [
+          { visits: { some: { doctorId: doctorIdFilter } } },
+          { tokenLogs: { some: { doctorId: doctorIdFilter } } },
+        ],
+      });
     }
 
     const patients = await prisma.patient.findMany({
-      where: whereClause,
+      where: andConditions.length > 0 ? { AND: andConditions } : {},
       include: {
         visits: {
+          where: doctorIdFilter ? { doctorId: doctorIdFilter } : {},
           orderBy: { createdAt: "desc" },
           take: 1,
           select: {

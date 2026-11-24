@@ -206,7 +206,7 @@ export function AdminBiometricModal({
                 </h3>
               </div>
               <p className="text-[11px] text-slate-400">
-                Ruqayya Clinic Enterprise Biometric Management · ISO 19794-2
+                Ruqayya Medical Center Enterprise Biometric Management · ISO 19794-2
               </p>
             </div>
           </div>

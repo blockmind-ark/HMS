@@ -468,7 +468,7 @@ export function BiometricModal({
                   : "Patient Biometric Identification & Visit Lookup"}
               </h3>
               <p className="text-[11px] text-slate-400">
-                Ruqayya Clinic & Pharmacy · Native Biometric WebAuthn Sensor
+                Ruqayya Medical Center & Pharmacy · Native Biometric WebAuthn Sensor
               </p>
             </div>
           </div>

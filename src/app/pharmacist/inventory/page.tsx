@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
 
 export const metadata = {
-  title: "289 Medicines Purchase Sheet | Ruqayya Clinic Pharmacy",
+  title: "289 Medicines Purchase Sheet | Ruqayya Medical Center Pharmacy",
   description: "Complete 289 hospital & pharmacy medicines purchase sheet with real-time cost calculation",
 };
 
@@ -35,7 +35,7 @@ export default async function PharmacistInventoryPage() {
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-emerald-400" />
               <span className="text-white font-black text-sm tracking-tight">
-                Ruqayya Clinic Pharmacy · 289 Medicines Sheet
+                Ruqayya Medical Center Pharmacy · 289 Medicines Sheet
               </span>
             </div>
           </div>

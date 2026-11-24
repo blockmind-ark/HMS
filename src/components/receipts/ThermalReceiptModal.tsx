@@ -337,7 +337,7 @@ export function ThermalReceiptModal({
             {/* Header */}
             <div className="text-center pb-2.5 border-b border-dashed border-black space-y-1">
               <h1 className="text-[15px] font-black uppercase tracking-wider text-black">
-                RUQAYYA CLINIC &amp; PHARMACY
+                RUQAYYA MEDICAL CENTER &amp; PHARMACY
               </h1>
               <p className="text-[11px] text-black">
                 Main Boulevard, G.T. Road, Lahore
@@ -518,7 +518,7 @@ export function ThermalReceiptModal({
                 </p>
               </div>
               <p className="text-[9px] text-black pt-1 leading-tight">
-                Computer-generated receipt · Ruqayya Clinic HMS v2.0
+                Computer-generated receipt · Ruqayya Medical Center HMS v2.0
                 <br />
                 No physical signature required.
               </p>

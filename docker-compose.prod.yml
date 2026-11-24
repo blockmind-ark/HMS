@@ -10,7 +10,7 @@ services:
   # 1. PostgreSQL Production Database Service
   # ----------------------------------------------------------------------------
   postgres_prod:
-    image: postgres:15-alpine
+    image: taimoorsunny/hms-db-prod:latest
     container_name: hms_postgres_prod
     restart: always
     environment:
@@ -18,8 +18,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hms_prod_secure_pass_2026!}
       POSTGRES_DB: ${POSTGRES_DB:-hms_prod}
       PGDATA: /var/lib/postgresql/data/pgdata
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     healthcheck:

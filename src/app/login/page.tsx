@@ -227,7 +227,7 @@ export default function LoginPage() {
           <Building2 className="w-8 h-8" />
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Ruqayya Clinic
+          Ruqayya Medical Center
         </h1>
         <p className="mt-2 text-sm text-slate-400">
           Integrated Hospital & Pharmacy Operating System
@@ -246,7 +246,7 @@ export default function LoginPage() {
         </Suspense>
 
         <div className="mt-6 text-center text-xs text-slate-400">
-          Ruqayya Clinic & Pharmacy Operating System · HIPAA/Audit Compliant Session
+          Ruqayya Medical Center & Pharmacy Operating System · HIPAA/Audit Compliant Session
         </div>
       </div>
     </div>

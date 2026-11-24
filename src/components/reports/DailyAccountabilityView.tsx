@@ -279,7 +279,7 @@ export function DailyAccountabilityView({
               Accountability Ledger
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Ruqayya Clinic · {portalType === "RECEPTIONIST" ? "Reception Desk" : "Pharmacy POS"}
+              Ruqayya Medical Center · {portalType === "RECEPTIONIST" ? "Reception Desk" : "Pharmacy POS"}
             </span>
           </div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight">

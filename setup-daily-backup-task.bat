@@ -2,7 +2,7 @@
 setlocal
 
 :: ============================================================================
-::       Ruqayya Clinic & Pharmacy Management System (HMS)
+::       Ruqayya Medical Center & Pharmacy Management System (HMS)
 ::     Windows Task Scheduler Setup for Day-Start & Day-End Backups
 :: ============================================================================
 
