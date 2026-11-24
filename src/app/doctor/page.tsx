@@ -818,40 +818,42 @@ export default function DoctorPortal() {
 
                             {/* Itemized Medicines Table */}
                             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                              <table className="w-full text-left text-xs text-slate-700">
-                                <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                                  <tr>
-                                    <th className="px-3.5 py-2">Medicine (Brand)</th>
-                                    <th className="px-3.5 py-2">Generic Name</th>
-                                    <th className="px-3.5 py-2">Category</th>
-                                    <th className="px-3.5 py-2 text-right">Qty</th>
-                                    <th className="px-3.5 py-2 text-right">Price</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {sale.items.map((item: any, i: number) => (
-                                    <tr key={i} className="hover:bg-slate-50/60">
-                                      <td className="px-3.5 py-2 font-bold text-slate-900">
-                                        {item.medicineName}
-                                      </td>
-                                      <td className="px-3.5 py-2 text-slate-600">
-                                        {item.genericName}
-                                      </td>
-                                      <td className="px-3.5 py-2">
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-700">
-                                          {item.category}
-                                        </span>
-                                      </td>
-                                      <td className="px-3.5 py-2 text-right font-mono font-bold text-slate-800">
-                                        {item.quantity}
-                                      </td>
-                                      <td className="px-3.5 py-2 text-right font-mono text-slate-900">
-                                        Rs. {item.totalPrice.toFixed(2)}
-                                      </td>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs text-slate-700">
+                                  <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                      <th className="px-3.5 py-2">Medicine (Brand)</th>
+                                      <th className="px-3.5 py-2">Generic Name</th>
+                                      <th className="px-3.5 py-2">Category</th>
+                                      <th className="px-3.5 py-2 text-right">Qty</th>
+                                      <th className="px-3.5 py-2 text-right">Price</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {sale.items.map((item: any, i: number) => (
+                                      <tr key={i} className="hover:bg-slate-50/60">
+                                        <td className="px-3.5 py-2 font-bold text-slate-900">
+                                          {item.medicineName}
+                                        </td>
+                                        <td className="px-3.5 py-2 text-slate-600">
+                                          {item.genericName}
+                                        </td>
+                                        <td className="px-3.5 py-2">
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-700">
+                                            {item.category}
+                                          </span>
+                                        </td>
+                                        <td className="px-3.5 py-2 text-right font-mono font-bold text-slate-800">
+                                          {item.quantity}
+                                        </td>
+                                        <td className="px-3.5 py-2 text-right font-mono text-slate-900">
+                                          Rs. {item.totalPrice.toFixed(2)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           </div>
                         ))}

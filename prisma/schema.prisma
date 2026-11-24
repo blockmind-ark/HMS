@@ -86,6 +86,8 @@ model User {
   vendorPayments            VendorPayment[]
   tokenLogs                 DailyTokenLog[]          @relation("UserTokenLogs")
   doctor                    Doctor?
+  processedReturns          MedicineReturn[]         @relation("UserMedicineReturns")
+  approvedReturns           MedicineReturn[]         @relation("ApprovedMedicineReturns")
 }
 
 model Patient {
@@ -168,6 +170,7 @@ model Medicine {
 
   batches     StockBatch[]
   saleItems   PharmacySaleItem[]
+  returnItems MedicineReturnItem[]
 
   @@index([itemType])
   @@index([category])
@@ -201,6 +204,7 @@ model PharmacySale {
   createdAt   DateTime           @default(now())
 
   items       PharmacySaleItem[]
+  returns     MedicineReturn[]
 }
 
 model PharmacySaleItem {
@@ -309,6 +313,8 @@ model ShiftClosing {
   adminComment    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  medicineReturns MedicineReturn[] @relation("ClosingMedicineReturns")
 }
 
 model DrawerAdjustment {
@@ -540,6 +546,7 @@ model DoctorAttendance {
   doctor       Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   dateStr      String   // Format YYYY-MM-DD
   status       String   @default("PRESENT") // "PRESENT" | "ABSENT" | "LEAVE" | "HALF_DAY"
+  isLocked     Boolean  @default(true) // Permanently locked once saved - cannot be altered
   checkInTime  String?  // e.g. "09:00 AM"
   checkOutTime String?  // e.g. "05:00 PM"
   notes        String?
@@ -589,4 +596,52 @@ model DoctorPayroll {
   @@index([doctorId])
   @@index([year, month])
 }
+
+model MedicineReturn {
+  id                String               @id @default(cuid())
+  returnNumber      String               @unique // RET-YYYY-XXXX
+  saleId            String?
+  sale              PharmacySale?        @relation(fields: [saleId], references: [id])
+  invoiceNumber     String?              // Optional reference to original POS/invoice number
+  patientName       String?              // Customer or patient name
+  customerPhone     String?              // Optional phone contact
+  reason            String               // e.g. "Expired/Damaged", "Wrong item", "Doctor changed prescription", "Patient recovered"
+  totalRefundAmount Float                @default(0)
+  status            String               @default("PENDING_CLOSING") // "PENDING_CLOSING" | "APPROVED" | "REJECTED"
+  dailyClosingId    String?              // Linked ShiftClosing sheet ID
+  dailyClosing      ShiftClosing?        @relation("ClosingMedicineReturns", fields: [dailyClosingId], references: [id])
+  closingDate       DateTime?            // Date of the shift closing sheet (or date of return creation)
+  approvedById      String?
+  approvedBy        User?                @relation("ApprovedMedicineReturns", fields: [approvedById], references: [id])
+  approvedAt        DateTime?
+  processedById     String
+  processedBy       User                 @relation("UserMedicineReturns", fields: [processedById], references: [id])
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  items             MedicineReturnItem[]
+
+  @@index([returnNumber])
+  @@index([saleId])
+  @@index([status])
+  @@index([dailyClosingId])
+  @@index([processedById])
+  @@index([createdAt])
+}
+
+model MedicineReturnItem {
+  id               String         @id @default(cuid())
+  returnId         String
+  medicineReturn   MedicineReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  medicineId       String
+  medicine         Medicine       @relation(fields: [medicineId], references: [id])
+  batchId          String?        // StockBatch returned into
+  quantityReturned Int
+  unitPrice        Float          // Unit price refunded
+  refundSubtotal   Float          // quantityReturned * unitPrice
+
+  @@index([returnId])
+  @@index([medicineId])
+}
+
 

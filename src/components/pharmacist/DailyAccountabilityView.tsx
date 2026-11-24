@@ -30,6 +30,11 @@ import {
   Pill,
   Sparkles,
 } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import {
+  ThermalReturnReceiptModal,
+  ReturnReceiptData,
+} from "@/components/receipts/ThermalReturnReceiptModal";
 import {
   ShiftClosingVoucherModal,
   ShiftClosingData,
@@ -62,6 +67,8 @@ export function DailyAccountabilityView() {
   const [showAllServices, setShowAllServices] = useState(false);
   const [breakdownViewFilter, setBreakdownViewFilter] = useState<"ALL" | "MEDICINES" | "SERVICES">("ALL");
   const [showHistory, setShowHistory] = useState(false);
+  const [returnReceiptModalOpen, setReturnReceiptModalOpen] = useState(false);
+  const [activeReturnReceipt, setActiveReturnReceipt] = useState<ReturnReceiptData | null>(null);
 
   const fetchShiftData = async (date: string) => {
     setLoading(true);
@@ -679,6 +686,126 @@ export function DailyAccountabilityView() {
           );
         })()}
 
+        {/* MEDICINE RETURNS & REFUNDS AUDIT SECTION */}
+        <div className="bg-rose-50/50 p-4 sm:p-5 rounded-2xl border border-rose-200/80 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-200/60 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+                <RotateCcw className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <span>Medicine Returns &amp; Refund Vouchers ({(data?.medicineReturns || []).length})</span>
+                  {(data?.summary?.pendingReturnsRefund || 0) > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                      Pending Closing Approval
+                    </span>
+                  )}
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Deducted from daily system cash. Returned medicines are automatically restocked into inventory when Admin accepts this Daily Closing Sheet.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="text-[10px] text-slate-500 uppercase font-bold block">Total Refunds Deducted</span>
+              <span className="font-mono font-black text-sm text-rose-700">
+                -Rs. {(data?.summary?.totalReturnsRefund || 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {(data?.medicineReturns || []).length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-4 bg-white rounded-xl border border-dashed border-rose-200">
+              No medicine returns or refund vouchers recorded for this date.
+            </p>
+          ) : (
+            <div className="border border-rose-200/80 rounded-xl overflow-hidden bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-rose-100/60 text-[10px] font-bold text-rose-900 uppercase tracking-wider border-b border-rose-200 whitespace-nowrap">
+                    <tr>
+                      <th className="py-2.5 px-3">Voucher #</th>
+                      <th className="py-2.5 px-2">Original Sale</th>
+                      <th className="py-2.5 px-2">Customer</th>
+                      <th className="py-2.5 px-3">Returned Items</th>
+                      <th className="py-2.5 px-2">Restock Status</th>
+                      <th className="py-2.5 px-3 text-right">Refund (Rs.)</th>
+                      <th className="py-2.5 px-3 text-center">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-100">
+                    {data.medicineReturns.map((ret: any) => (
+                      <tr key={ret.id} className="hover:bg-rose-50/30 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-rose-800 whitespace-nowrap">
+                          {ret.returnNumber}
+                        </td>
+                        <td className="py-2.5 px-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                          {ret.invoiceNumber || "Direct"}
+                        </td>
+                        <td className="py-2.5 px-2 text-slate-800 font-medium whitespace-nowrap">
+                          {ret.patientName || "Walk-in"}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] text-slate-700 max-w-xs">
+                          {ret.items?.map((it: any) => `${it.medicine?.name} (${it.quantityReturned})`).join(", ")}
+                        </td>
+                        <td className="py-2.5 px-2 whitespace-nowrap">
+                          {ret.status === "APPROVED" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              ✓ Restocked &amp; Approved
+                            </span>
+                          ) : ret.status === "REJECTED" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-800 border border-red-200">
+                              Rejected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                              ⏳ Pending Admin Closing
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-rose-700 whitespace-nowrap">
+                          Rs. {ret.totalRefundAmount.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveReturnReceipt({
+                                returnNumber: ret.returnNumber,
+                                invoiceNumber: ret.invoiceNumber,
+                                createdAt: ret.createdAt,
+                                pharmacistName: ret.processedBy?.name || "Pharmacist",
+                                patientName: ret.patientName,
+                                customerPhone: ret.customerPhone,
+                                reason: ret.reason,
+                                status: ret.status,
+                                items: ret.items.map((it: any) => ({
+                                  name: it.medicine?.name || "Medicine",
+                                  quantityReturned: it.quantityReturned,
+                                  unitPrice: it.unitPrice,
+                                  refundSubtotal: it.refundSubtotal,
+                                })),
+                                totalRefundAmount: ret.totalRefundAmount,
+                              });
+                              setReturnReceiptModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 bg-white hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg text-[10px] font-bold flex items-center gap-1 mx-auto shadow-2xs"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>Print Slip</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Total Summary Footer */}
         <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold text-slate-600">
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -930,6 +1057,13 @@ export function DailyAccountabilityView() {
         onClose={() => setDrawerModalOpen(false)}
         onSuccess={() => fetchShiftData(selectedDate)}
         mode="CASH_IN"
+      />
+
+      {/* Thermal Return Receipt Modal */}
+      <ThermalReturnReceiptModal
+        isOpen={returnReceiptModalOpen}
+        onClose={() => setReturnReceiptModalOpen(false)}
+        data={activeReturnReceipt}
       />
 
       {/* Add Expenditure Modal */}

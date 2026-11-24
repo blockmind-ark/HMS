@@ -152,17 +152,37 @@ export async function GET() {
         const totalCashOut = cashOutList.reduce((sum, item) => sum + item.amount, 0);
 
         if (shift.portal === "PHARMACY") {
-          const sales = await prisma.pharmacySale.findMany({
-            where: {
-              userId: shift.userId,
-              createdAt: { gte: startOfDay, lte: endOfDay },
-            },
-            include: {
-              items: {
-                include: { medicine: true },
+          const [sales, medicineReturns] = await Promise.all([
+            prisma.pharmacySale.findMany({
+              where: {
+                userId: shift.userId,
+                createdAt: { gte: startOfDay, lte: endOfDay },
               },
-            },
-          });
+              include: {
+                items: {
+                  include: { medicine: true },
+                },
+              },
+            }),
+            prisma.medicineReturn.findMany({
+              where: {
+                OR: [
+                  { dailyClosingId: shift.id },
+                  {
+                    processedById: shift.userId,
+                    createdAt: { gte: startOfDay, lte: endOfDay },
+                  },
+                ],
+              },
+              include: {
+                items: {
+                  include: { medicine: true },
+                },
+                processedBy: { select: { id: true, name: true } },
+              },
+              orderBy: { createdAt: "desc" },
+            }),
+          ]);
 
           const medBreakdown: Record<string, { count: number; total: number }> = {};
           for (const s of sales) {
@@ -178,6 +198,11 @@ export async function GET() {
             .map(([service, d]) => ({ service, count: d.count, total: d.total }))
             .sort((a, b) => b.total - a.total || b.count - a.count);
 
+          const totalReturnsRefund = medicineReturns.reduce(
+            (sum, ret) => sum + (ret.totalRefundAmount || 0),
+            0
+          );
+
           return {
             ...shift,
             invoiceCount: sales.length,
@@ -187,6 +212,8 @@ export async function GET() {
             cashOutList,
             totalCashIn,
             totalCashOut,
+            medicineReturns,
+            totalReturnsRefund,
           };
         }
 
@@ -419,7 +446,7 @@ export async function POST(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 2. SHIFT CLOSING APPROVAL & FINAL COMMIT
+    // 2. SHIFT CLOSING APPROVAL & FINAL COMMIT (+ ATOMIC RETURN RESTOCK)
     // -------------------------------------------------------------
     if (type === "SHIFT_CLOSING") {
       const shiftClosing = await prisma.shiftClosing.findUnique({
@@ -433,17 +460,107 @@ export async function POST(req: NextRequest) {
 
       const targetStatus = status === "APPROVED" ? ShiftStatus.APPROVED : ShiftStatus.REJECTED;
 
-      const updatedShift = await prisma.shiftClosing.update({
-        where: { id },
-        data: {
-          status: targetStatus,
-          approvedById: session.user.id,
-          adminComment: comment || null,
-        },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          approvedBy: { select: { id: true, name: true, email: true } },
-        },
+      // Atomic execution: update ShiftClosing and, if APPROVED on Pharmacy portal, restock all pending return items
+      const { updatedShift, restockedItemsCount } = await prisma.$transaction(async (tx) => {
+        const updated = await tx.shiftClosing.update({
+          where: { id },
+          data: {
+            status: targetStatus,
+            approvedById: session.user.id,
+            adminComment: comment || null,
+          },
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            approvedBy: { select: { id: true, name: true, email: true } },
+          },
+        });
+
+        let restockedCount = 0;
+
+        // Step C: When Admin accepts Pharmacy Daily Closing Sheet, restock inventory for all unapproved/pending returns
+        if (targetStatus === ShiftStatus.APPROVED && shiftClosing.portal === "PHARMACY") {
+          const sDate = new Date(shiftClosing.shiftDate);
+          const startOfDay = new Date(sDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(sDate);
+          endOfDay.setHours(23, 59, 59, 999);
+
+          // Find pending returns linked to this closing or created within shift date by this user
+          const pendingReturns = await tx.medicineReturn.findMany({
+            where: {
+              status: "PENDING_CLOSING",
+              OR: [
+                { dailyClosingId: shiftClosing.id },
+                {
+                  processedById: shiftClosing.userId,
+                  createdAt: { gte: startOfDay, lte: endOfDay },
+                },
+              ],
+            },
+            include: {
+              items: true,
+            },
+          });
+
+          for (const ret of pendingReturns) {
+            for (const item of ret.items) {
+              let targetBatch = null;
+
+              if (item.batchId) {
+                targetBatch = await tx.stockBatch.findUnique({ where: { id: item.batchId } });
+              }
+
+              if (!targetBatch) {
+                targetBatch = await tx.stockBatch.findFirst({
+                  where: { medicineId: item.medicineId },
+                  orderBy: [{ createdAt: "desc" }],
+                });
+              }
+
+              if (targetBatch) {
+                await tx.stockBatch.update({
+                  where: { id: targetBatch.id },
+                  data: {
+                    quantity: { increment: item.quantityReturned },
+                  },
+                });
+              } else {
+                const med = await tx.medicine.findUnique({ where: { id: item.medicineId } });
+                if (med) {
+                  const defaultExpiry = new Date();
+                  defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
+                  await tx.stockBatch.create({
+                    data: {
+                      medicineId: med.id,
+                      batchNumber: "RET-RESTOCK",
+                      quantity: item.quantityReturned,
+                      purchasePrice: item.unitPrice * 0.8,
+                      sellingPrice: item.unitPrice,
+                      mfgDate: new Date(),
+                      expiryDate: defaultExpiry,
+                      approvalStatus: "APPROVED",
+                    },
+                  });
+                }
+              }
+
+              restockedCount += item.quantityReturned;
+            }
+
+            // Mark return voucher as APPROVED so it is NEVER double-restocked
+            await tx.medicineReturn.update({
+              where: { id: ret.id },
+              data: {
+                status: "APPROVED",
+                dailyClosingId: shiftClosing.id,
+                approvedById: session.user.id,
+                approvedAt: new Date(),
+              },
+            });
+          }
+        }
+
+        return { updatedShift: updated, restockedItemsCount: restockedCount };
       });
 
       await recordAuditLog({
@@ -451,16 +568,19 @@ export async function POST(req: NextRequest) {
         action: status === "APPROVED" ? "SHIFT_CLOSE_APPROVED" : "SHIFT_CLOSE_REJECTED",
         details: `Admin ${session.user.name} ${status.toLowerCase()} and ${
           status === "APPROVED" ? "permanently committed" : "returned"
-        } Shift Closing for ${shiftClosing.user.name} (${new Date(shiftClosing.shiftDate).toISOString().split("T")[0]}). System Cash: Rs. ${shiftClosing.totalSystemCash.toLocaleString()} | Physical Cash: Rs. ${shiftClosing.countedCash.toLocaleString()} | Variance: Rs. ${shiftClosing.variance.toLocaleString()}. Note: "${comment || "N/A"}".`,
+        } Shift Closing for ${shiftClosing.user.name} (${new Date(shiftClosing.shiftDate).toISOString().split("T")[0]}). System Cash: Rs. ${shiftClosing.totalSystemCash.toLocaleString()} | Physical Cash: Rs. ${shiftClosing.countedCash.toLocaleString()} | Variance: Rs. ${shiftClosing.variance.toLocaleString()}.${
+          restockedItemsCount > 0 ? ` Restocked ${restockedItemsCount} returned medicine units into inventory.` : ""
+        } Note: "${comment || "N/A"}".`,
       });
 
       return NextResponse.json({
         success: true,
         type: "SHIFT_CLOSING",
         shiftClosing: updatedShift,
+        restockedItemsCount,
         message:
           status === "APPROVED"
-            ? "Shift closing sheet accepted & officially committed."
+            ? `Shift closing sheet accepted & committed.${restockedItemsCount > 0 ? ` Restocked ${restockedItemsCount} returned medicine units.` : ""}`
             : "Shift submission rejected and returned for re-entry.",
       });
     }

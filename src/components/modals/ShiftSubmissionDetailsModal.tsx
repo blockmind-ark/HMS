@@ -112,6 +112,64 @@ export function ShiftSubmissionDetailsModal({
             </div>
           </div>
 
+          {/* Medicine Returns & Restocking Manifest (Pharmacy Portal Shifts) */}
+          {shift.portal === "PHARMACY" && shift.medicineReturns && shift.medicineReturns.length > 0 && (
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-amber-700" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-950">
+                    Medicine Returns & Restocking Manifest ({shift.medicineReturns.length})
+                  </h4>
+                </div>
+                <span className="text-[11px] font-mono font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200">
+                  -Rs. {(shift.totalReturnsRefund || 0).toLocaleString()} Refunded
+                </span>
+              </div>
+
+              <div className="divide-y divide-amber-100 max-h-48 overflow-y-auto">
+                {shift.medicineReturns.map((ret: any) => (
+                  <div key={ret.id} className="py-2.5 flex items-center justify-between text-xs hover:bg-amber-100/50 px-2 rounded-lg">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-slate-900">{ret.returnNumber}</span>
+                        <span className="text-[10px] text-slate-500">
+                          Sale: {ret.saleNumber || "N/A"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                          ret.status === "APPROVED"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            : "bg-amber-100 text-amber-900 border border-amber-300"
+                        }`}>
+                          {ret.status === "APPROVED" ? "✓ Restocked & Approved" : "⏳ Pending Restock Approval"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 font-medium">
+                        Customer: <strong className="text-slate-900">{ret.customerName || "Walk-in Customer"}</strong>
+                        {ret.reason && <span className="text-slate-500 italic"> — &ldquo;{ret.reason}&rdquo;</span>}
+                      </p>
+                      {ret.items && (
+                        <p className="text-[10px] text-slate-500 truncate max-w-sm">
+                          Items: {ret.items.map((it: any) => `${it.medicine?.name || "Medicine"} (x${it.quantityReturned})`).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <span className="font-mono font-black text-rose-700 text-sm">
+                      -Rs. {(ret.totalRefundAmount || 0).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-2.5 bg-amber-100/60 rounded-xl border border-amber-200 text-[11px] text-amber-900 font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>
+                  <strong>Accountability Notice:</strong> Accepting this shift closing sheet will finalize financial drawer reconciliation and automatically restock returned medicines into inventory.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Financial Reconciliation Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Physical Cash Submitted */}

@@ -55,6 +55,7 @@ import { MedicinePurchaseSheetView } from "@/components/inventory/MedicinePurcha
 import { AdminMedicineCatalogManagementView } from "@/components/admin/AdminMedicineCatalogManagementView";
 import { AdminServicesManagementView } from "@/components/admin/AdminServicesManagementView";
 import { AdminDoctorManagementView } from "@/components/admin/AdminDoctorManagementView";
+import { AdminMobileNavDrawer } from "@/components/admin/AdminMobileNavDrawer";
 
 export default function AdminPortal() {
   const [activeTab, setActiveTab] = useState<
@@ -74,7 +75,7 @@ export default function AdminPortal() {
   const [dailyReport, setDailyReport] = useState<any | null>(null);
   const [loadingDailyReport, setLoadingDailyReport] = useState(false);
   const [dailyStreamFilter, setDailyStreamFilter] = useState<
-    "ALL" | "CLINICAL" | "PHARMACY"
+    "ALL" | "CLINICAL" | "PHARMACY" | "RETURNS"
   >("ALL");
 
   // Approvals state
@@ -426,7 +427,19 @@ export default function AdminPortal() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+        {/* Mobile-Friendly Drawer & Header for Admin Portal */}
+        <AdminMobileNavDrawer
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            if (tab === "users") fetchUsers();
+            if (tab === "daily") fetchDailyReport(dailyDate);
+            if (tab === "reports") fetchReportsOverview();
+          }}
+          pendingApprovalsCount={totalPendingApprovals}
+        />
+
         {/* Banner notification */}
         {notification && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center justify-between shadow-sm animate-in slide-in-from-top duration-200">
@@ -443,8 +456,8 @@ export default function AdminPortal() {
           </div>
         )}
 
-        {/* Tab Controls */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        {/* Desktop Tab Controls (Hidden on small mobile screens to prevent horizontal overflow) */}
+        <div className="hidden lg:flex items-center justify-between border-b border-slate-200 pb-2">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setActiveTab("dashboard")}
@@ -1437,6 +1450,18 @@ export default function AdminPortal() {
                   >
                     Pharmacy POS Sales ({dailyReport.pharmacySales.length})
                   </button>
+                  {dailyReport.medicineReturns && dailyReport.medicineReturns.length > 0 && (
+                    <button
+                      onClick={() => setDailyStreamFilter("RETURNS")}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        dailyStreamFilter === "RETURNS"
+                          ? "bg-rose-600 text-white shadow-sm"
+                          : "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50"
+                      }`}
+                    >
+                      Medicine Returns ({dailyReport.medicineReturns.length})
+                    </button>
+                  )}
                 </div>
 
                 {/* Section 1: Clinical Hospital Invoices Table */}
@@ -1652,6 +1677,95 @@ export default function AdminPortal() {
                     </div>
                   </div>
                 )}
+
+                {/* Section 3: Medicine Returns & Refunds Manifest */}
+                {(dailyStreamFilter === "ALL" || dailyStreamFilter === "RETURNS" || dailyStreamFilter === "PHARMACY") &&
+                  dailyReport.medicineReturns &&
+                  dailyReport.medicineReturns.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
+                      <div className="p-4 bg-rose-50/70 border-b border-rose-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-rose-700" />
+                          <h4 className="text-xs font-bold text-rose-950 uppercase tracking-wider">
+                            3. Medicine Returns &amp; Refund Vouchers ({dailyReport.medicineReturns.length})
+                          </h4>
+                        </div>
+                        <span className="text-xs font-black text-rose-900">
+                          Total Returns Deducted: -Rs. {dailyReport.summary.totalReturnsRefund?.toFixed(2) || "0.00"}
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs text-slate-700">
+                          <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                            <tr>
+                              <th className="px-4 py-3">Time</th>
+                              <th className="px-4 py-3">Return Voucher #</th>
+                              <th className="px-4 py-3">Original Sale</th>
+                              <th className="px-4 py-3">Customer Name</th>
+                              <th className="px-4 py-3">Pharmacist</th>
+                              <th className="px-4 py-3">Returned Medicines</th>
+                              <th className="px-4 py-3">Reason</th>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3 text-right">Refund Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {dailyReport.medicineReturns.map((ret: any) => (
+                              <tr key={ret.id} className="hover:bg-rose-50/40">
+                                <td className="px-4 py-3 font-mono text-slate-500">
+                                  {new Date(ret.createdAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </td>
+                                <td className="px-4 py-3 font-mono font-bold text-rose-700">
+                                  {ret.returnNumber}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-slate-600">
+                                  {ret.saleNumber || "Direct Return"}
+                                </td>
+                                <td className="px-4 py-3 font-bold text-slate-900">
+                                  {ret.customerName}
+                                </td>
+                                <td className="px-4 py-3 text-slate-600">
+                                  {ret.processedByName}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-slate-800 max-w-xs truncate" title={ret.itemsSummary}>
+                                  {ret.itemsSummary}
+                                </td>
+                                <td className="px-4 py-3 text-slate-500 italic max-w-xs truncate" title={ret.reason}>
+                                  {ret.reason || "N/A"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    ret.status === "APPROVED"
+                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                      : "bg-amber-100 text-amber-900 border border-amber-300"
+                                  }`}>
+                                    {ret.status === "APPROVED" ? "Restocked" : "Pending Restock"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right font-black text-rose-700 font-mono">
+                                  -Rs. {ret.totalRefundAmount.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-rose-50/50 font-bold border-t border-rose-200">
+                            <tr>
+                              <td colSpan={8} className="px-4 py-2.5 text-right text-rose-900">
+                                Total Return Deductions ({dailyReport.medicineReturns.length} vouchers):
+                              </td>
+                              <td className="px-4 py-2.5 text-right text-rose-900 font-black font-mono">
+                                -Rs. {dailyReport.summary.totalReturnsRefund?.toFixed(2) || "0.00"}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Print Sign-off block (Only visible on print) */}
                 <div className="hidden print:block pt-14 space-y-10">

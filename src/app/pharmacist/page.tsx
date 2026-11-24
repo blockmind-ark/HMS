@@ -35,7 +35,10 @@ import {
   Lock,
   Phone,
   Filter,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { PharmacyMedicineReturnsView } from "@/components/pharmacy/PharmacyMedicineReturnsView";
 import {
   ThermalReceiptModal,
   ReceiptData,
@@ -91,7 +94,7 @@ const SERVICE_PRESETS = [
 ];
 
 export default function PharmacistPortal() {
-  const [activeTab, setActiveTab] = useState<"pos" | "services" | "inventory" | "accountability" | "vendors">("pos");
+  const [activeTab, setActiveTab] = useState<"pos" | "services" | "returns" | "inventory" | "accountability" | "vendors">("pos");
   const [inventorySubTab, setInventorySubTab] = useState<"purchaseSheet" | "batches">("purchaseSheet");
 
   // Daily Summary Stats for KPI cards
@@ -106,6 +109,11 @@ export default function PharmacistPortal() {
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
   const [lowStockCount, setLowStockCount] = useState<number>(0);
   const [filterLowStockOnly, setFilterLowStockOnly] = useState<boolean>(false);
+  const [isLowStockAlarmMinimized, setIsLowStockAlarmMinimized] = useState<boolean>(false);
+  const [isTokenQueueMinimized, setIsTokenQueueMinimized] = useState<boolean>(false);
+
+  // Editable typed quantities state for POS Cart
+  const [typedQuantities, setTypedQuantities] = useState<Record<string, string>>({});
 
   const fetchDailyStats = async () => {
     try {
@@ -561,8 +569,14 @@ export default function PharmacistPortal() {
     });
   };
 
-  // Cart quantity controls
+  // Cart quantity controls (Typed numeric input + buttons)
   const updateQuantity = (medicineId: string, delta: number) => {
+    setTypedQuantities((prev) => {
+      const copy = { ...prev };
+      delete copy[medicineId];
+      return copy;
+    });
+
     setCart((prev) =>
       prev
         .map((it) => {
@@ -570,7 +584,6 @@ export default function PharmacistPortal() {
             const nextQty = it.quantity + delta;
             if (nextQty <= 0) return null;
             if (nextQty > it.maxStock) {
-              alert(`Only ${it.maxStock} units available in active batch`);
               return it;
             }
             return { ...it, quantity: nextQty };
@@ -578,6 +591,38 @@ export default function PharmacistPortal() {
           return it;
         })
         .filter(Boolean) as CartItem[]
+    );
+  };
+
+  const handleTypedQuantityChange = (medicineId: string, rawVal: string) => {
+    // Retain typed string so user can clear/backspace comfortably
+    setTypedQuantities((prev) => ({ ...prev, [medicineId]: rawVal }));
+
+    const num = parseInt(rawVal, 10);
+    if (!isNaN(num) && num >= 1) {
+      const item = cart.find((i) => i.medicineId === medicineId);
+      if (!item) return;
+      const clamped = Math.min(item.maxStock, num);
+      setCart((prev) =>
+        prev.map((it) => (it.medicineId === medicineId ? { ...it, quantity: clamped } : it))
+      );
+    }
+  };
+
+  const handleTypedQuantityBlur = (medicineId: string, maxStock: number) => {
+    const rawVal = typedQuantities[medicineId];
+    let num = parseInt(rawVal || "1", 10);
+    if (isNaN(num) || num < 1) num = 1;
+    if (num > maxStock) num = maxStock;
+
+    setTypedQuantities((prev) => {
+      const copy = { ...prev };
+      delete copy[medicineId];
+      return copy;
+    });
+
+    setCart((prev) =>
+      prev.map((it) => (it.medicineId === medicineId ? { ...it, quantity: num } : it))
     );
   };
 
@@ -880,11 +925,11 @@ export default function PharmacistPortal() {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-2 gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 pb-1">
             <button
               onClick={() => setActiveTab("pos")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "pos"
                   ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                   : "text-slate-600 hover:bg-slate-100"
@@ -898,7 +943,7 @@ export default function PharmacistPortal() {
                 setActiveTab("services");
                 fetchTodayTokens();
               }}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "services"
                   ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                   : "text-slate-600 hover:bg-slate-100"
@@ -908,19 +953,30 @@ export default function PharmacistPortal() {
               <span>Other Services &amp; Invoicing</span>
             </button>
             <button
+              onClick={() => setActiveTab("returns")}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+                activeTab === "returns"
+                  ? "bg-rose-600 text-white shadow-md shadow-rose-500/20"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Medicine Returns</span>
+            </button>
+            <button
               onClick={() => setActiveTab("inventory")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "inventory"
                   ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>Stock Batches &amp; Restock Requests</span>
+              <span>Stock Batches &amp; Requests</span>
             </button>
             <button
               onClick={() => setActiveTab("accountability")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "accountability"
                   ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                   : "text-slate-600 hover:bg-slate-100"
@@ -932,7 +988,7 @@ export default function PharmacistPortal() {
             {SHOW_VENDORS_TAB && (
               <button
                 onClick={() => setActiveTab("vendors")}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                   activeTab === "vendors"
                     ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
                     : "text-slate-600 hover:bg-slate-100"
@@ -982,9 +1038,11 @@ export default function PharmacistPortal() {
                       {lowStockCount} {lowStockCount === 1 ? "Item" : "Items"} at or below Warning Threshold
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Live dispensary stock is at or below defined safety limits (<code>quantity &le; threshold</code>). Click any item below to immediately submit a restock batch request.
-                  </p>
+                  {!isLowStockAlarmMinimized && (
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Live dispensary stock is at or below defined safety limits (<code>quantity &le; threshold</code>). Click any item below to immediately submit a restock batch request.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1019,40 +1077,63 @@ export default function PharmacistPortal() {
                   <Plus className="w-3.5 h-3.5 text-amber-400" />
                   <span>Restock Intake</span>
                 </button>
+
+                {/* Minimize / Maximize Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsLowStockAlarmMinimized(!isLowStockAlarmMinimized)}
+                  className="px-2.5 py-2 bg-white/90 hover:bg-white border border-red-300 rounded-xl text-red-900 transition-colors shadow-xs flex items-center gap-1 text-xs font-bold"
+                  title={isLowStockAlarmMinimized ? "Expand Low Stock Alert Card" : "Minimize Low Stock Alert Card"}
+                  aria-label={isLowStockAlarmMinimized ? "Expand Low Stock Alert" : "Minimize Low Stock Alert"}
+                >
+                  {isLowStockAlarmMinimized ? (
+                    <>
+                      <ChevronDown className="w-4 h-4 text-red-700" />
+                      <span className="hidden sm:inline">Expand</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp className="w-4 h-4 text-red-700" />
+                      <span className="hidden sm:inline">Minimize</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* Low-Stock Item Badges */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {lowStockItems.slice(0, 10).map((item: any) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => openRestockForMedicine(item)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 hover:border-red-400 hover:bg-red-50/60 rounded-xl text-xs shadow-sm transition-all text-left group"
-                  title={`Click to initiate restock batch for ${item.name}`}
-                >
-                  <span className="font-extrabold text-slate-900 group-hover:text-red-700 transition-colors">
-                    {item.name}
+            {/* Low-Stock Item Badges (Collapsible) */}
+            {!isLowStockAlarmMinimized && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-200/60">
+                {lowStockItems.slice(0, 10).map((item: any) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openRestockForMedicine(item)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 hover:border-red-400 hover:bg-red-50/60 rounded-xl text-xs shadow-sm transition-all text-left group"
+                    title={`Click to initiate restock batch for ${item.name}`}
+                  >
+                    <span className="font-extrabold text-slate-900 group-hover:text-red-700 transition-colors">
+                      {item.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400">({item.category})</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800">
+                      Remaining: {item.totalStock}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Limit: {item.threshold}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-700 underline ml-0.5">
+                      + Restock
+                    </span>
+                  </button>
+                ))}
+                {lowStockItems.length > 10 && (
+                  <span className="text-xs font-bold text-red-700 self-center pl-1">
+                    +{lowStockItems.length - 10} more low-stock items
                   </span>
-                  <span className="text-[10px] text-slate-400">({item.category})</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800">
-                    Remaining: {item.totalStock}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    Limit: {item.threshold}
-                  </span>
-                  <span className="text-[10px] font-bold text-amber-700 underline ml-0.5">
-                    + Restock
-                  </span>
-                </button>
-              ))}
-              {lowStockItems.length > 10 && (
-                <span className="text-xs font-bold text-red-700 self-center pl-1">
-                  +{lowStockItems.length - 10} more low-stock items
-                </span>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1104,9 +1185,33 @@ export default function PharmacistPortal() {
                   >
                     <RotateCcw className={`w-3.5 h-3.5 ${loadingTodayTokens ? "animate-spin text-indigo-600" : ""}`} />
                   </button>
+
+                  {/* Minimize / Maximize Toggle Button for Active Token Queue */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTokenQueueMinimized(!isTokenQueueMinimized)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 transition-all shrink-0"
+                    title={isTokenQueueMinimized ? "Expand Token Queue" : "Minimize Token Queue"}
+                    aria-label={isTokenQueueMinimized ? "Expand Token Queue" : "Minimize Token Queue"}
+                  >
+                    {isTokenQueueMinimized ? (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="hidden sm:inline">Expand</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="hidden sm:inline">Minimize</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
+              {/* Collapsible Token Queue Body */}
+              {!isTokenQueueMinimized && (
+                <>
               {/* Centered Mounted Token Search Bar with Dropdown Menu */}
               <div className="max-w-xl mx-auto w-full relative pt-1">
                 <div className="relative">
@@ -1236,725 +1341,714 @@ export default function PharmacistPortal() {
                   </div>
                 </div>
               )}
+                </>
+              )}
             </div>
 
-            {/* 2. CENTER SECTION: Search Controls & Complete Stock Directory (Placed between Token Queue and Bottom Cart) */}
-            <div className="space-y-4">
-              {/* Item Type Selector & Search Controls */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-                {/* Item Type Switcher (All vs Medicines vs Surgical) */}
-                <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveItemType("ALL");
-                      setSelectedCategory("All");
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      activeItemType === "ALL"
-                        ? "bg-white text-slate-900 shadow-sm border border-slate-200"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5 text-amber-600" />
-                    <span>All Inventory</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-slate-200/80 text-slate-700">
-                      {catalogSummary.totalCombined}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveItemType("MEDICINE");
-                      setSelectedCategory("All");
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      activeItemType === "MEDICINE"
-                        ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
-                        : "text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/60"
-                    }`}
-                  >
-                    <Pill className="w-3.5 h-3.5" />
-                    <span>Medicines</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        activeItemType === "MEDICINE"
-                          ? "bg-emerald-700 text-white"
-                          : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {catalogSummary.totalMedicines}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveItemType("SURGICAL");
-                      setSelectedCategory("All");
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                      activeItemType === "SURGICAL"
-                        ? "bg-sky-600 text-white shadow-sm shadow-sky-600/30"
-                        : "text-slate-600 hover:text-sky-700 hover:bg-sky-50/60"
-                    }`}
-                  >
-                    <Scissors className="w-3.5 h-3.5" />
-                    <span>Surgical &amp; Supplies</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        activeItemType === "SURGICAL"
-                          ? "bg-sky-700 text-white"
-                          : "bg-sky-100 text-sky-800"
-                      }`}
-                    >
-                      {catalogSummary.totalSurgical}
-                    </span>
-                  </button>
-                </div>
-
-                {/* Instant Search Bar with Search Button */}
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute inset-y-0 left-3 my-auto text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={
-                        activeItemType === "SURGICAL"
-                          ? "Search by Surgical Name (Cannula, Syringe, Saline, Suture, Catheter), Gauge, or Batch No..."
-                          : activeItemType === "MEDICINE"
-                          ? "Search by Medicine Name (Augmentin, Panadol, Acefyl, Abocal), Form, or Batch No..."
-                          : "Search all 334 medicines & surgical items by name, specification, or batch..."
-                      }
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          fetchMedicines();
-                        }
-                      }}
-                      className="w-full pl-9 pr-9 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 placeholder:text-slate-400"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchQuery("");
-                        }}
-                        className="absolute right-3 inset-y-0 my-auto text-slate-400 hover:text-slate-600 p-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => fetchMedicines()}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                    <span>Search</span>
-                  </button>
-                </div>
-
-                {/* Categories Scrollable Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  {catalogSummary.categories.map((cat) => (
+            {/* 2 & 3: TWO-COLUMN SIDE-BY-SIDE SPLIT LAYOUT (STOCK DIRECTORY + POS TERMINAL CART) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              {/* LEFT COLUMN: Search Controls & Stock Directory (7 Cols on Desktop) */}
+              <div className="lg:col-span-7 xl:col-span-7 space-y-3.5">
+                {/* Item Type Selector & Search Controls */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2.5">
+                  {/* Item Type Switcher (All vs Medicines vs Surgical) */}
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
                     <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                        selectedCategory === cat
-                          ? "bg-amber-100 text-amber-900 border border-amber-300 shadow-xs"
-                          : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      type="button"
+                      onClick={() => {
+                        setActiveItemType("ALL");
+                        setSelectedCategory("All");
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        activeItemType === "ALL"
+                          ? "bg-white text-slate-900 shadow-xs border border-slate-200"
+                          : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
-                      {cat}
+                      <Layers className="w-3.5 h-3.5 text-amber-600" />
+                      <span>All Inventory</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-slate-200/80 text-slate-700">
+                        {catalogSummary.totalCombined}
+                      </span>
                     </button>
-                  ))}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveItemType("MEDICINE");
+                        setSelectedCategory("All");
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        activeItemType === "MEDICINE"
+                          ? "bg-emerald-600 text-white shadow-xs shadow-emerald-600/30"
+                          : "text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/60"
+                      }`}
+                    >
+                      <Pill className="w-3.5 h-3.5" />
+                      <span>Medicines</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          activeItemType === "MEDICINE"
+                            ? "bg-emerald-700 text-white"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {catalogSummary.totalMedicines}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveItemType("SURGICAL");
+                        setSelectedCategory("All");
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        activeItemType === "SURGICAL"
+                          ? "bg-sky-600 text-white shadow-xs shadow-sky-600/30"
+                          : "text-slate-600 hover:text-sky-700 hover:bg-sky-50/60"
+                      }`}
+                    >
+                      <Scissors className="w-3.5 h-3.5" />
+                      <span>Surgical</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          activeItemType === "SURGICAL"
+                            ? "bg-sky-700 text-white"
+                            : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {catalogSummary.totalSurgical}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Search Input Bar with Filter Tag */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder={
+                          activeItemType === "MEDICINE"
+                            ? "Search medicine name, generic name, formula, or batch..."
+                            : activeItemType === "SURGICAL"
+                            ? "Search surgical item, category, or batch number..."
+                            : "Search medicine or surgical item by name, generic, or batch..."
+                        }
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            fetchMedicines();
+                          }
+                        }}
+                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-900 placeholder:text-slate-400 transition-all"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery("");
+                            fetchMedicines();
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fetchMedicines()}
+                      disabled={loadingCatalog}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      <span>{loadingCatalog ? "..." : "Search"}</span>
+                    </button>
+                  </div>
+
+                  {/* Category Pills Scroller */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">
+                      Category:
+                    </span>
+                    {catalogSummary.categories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap shrink-0 ${
+                          selectedCategory === cat
+                            ? "bg-slate-900 text-white shadow-2xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medicines & Surgical Catalog - Compact Tabular View */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+                  <div className="py-2.5 px-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-amber-600" />
+                      <span>
+                        {searchQuery.trim()
+                          ? `Results (${medicines.length})`
+                          : `Stock Directory (Showing 3 of ${catalogSummary.totalCombined})`}
+                      </span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {searchQuery.trim() ? "Matches below" : "Search to filter"}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2 px-2.5">Item Name &amp; Spec</th>
+                          <th className="py-2 px-2">Type / Cat</th>
+                          <th className="py-2 px-2">Batch / Exp</th>
+                          <th className="py-2 px-2">Stock</th>
+                          <th className="py-2 px-2.5 text-right">Price (Rs.)</th>
+                          <th className="py-2 px-2 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {medicines.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                              {loadingCatalog
+                                ? "Loading inventory catalog..."
+                                : `No items found matching "${searchQuery}".`}
+                            </td>
+                          </tr>
+                        ) : (
+                          (searchQuery.trim() ? medicines : medicines.slice(0, 3)).map((med) => {
+                            const outOfStock = med.totalStock <= 0;
+                            const isSurgical = med.itemType === "SURGICAL";
+
+                            return (
+                              <tr
+                                key={med.id}
+                                className={`transition-colors ${
+                                  outOfStock
+                                    ? "bg-slate-50/70 opacity-60"
+                                    : isSurgical
+                                    ? "hover:bg-sky-50/40"
+                                    : "hover:bg-amber-50/40"
+                                }`}
+                              >
+                                <td className="py-1.5 px-2.5">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <span className="font-extrabold text-slate-900 text-xs">
+                                      {med.name}
+                                    </span>
+                                    {isSurgical ? (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-sky-100 text-sky-800 border border-sky-300">
+                                        <Scissors className="w-2.5 h-2.5" />
+                                        Surgical
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <Pill className="w-2.5 h-2.5" />
+                                        Med
+                                      </span>
+                                    )}
+                                    {med.isGeneric && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
+                                        <Sparkles className="w-2.5 h-2.5" />
+                                        5% Off
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 font-medium truncate max-w-[200px]">
+                                    {med.genericName}
+                                  </p>
+                                </td>
+                                <td className="py-1.5 px-2">
+                                  <span
+                                    className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold whitespace-nowrap ${
+                                      isSurgical
+                                        ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                        : "bg-slate-100 text-slate-600 border border-slate-200"
+                                    }`}
+                                  >
+                                    {med.category}
+                                  </span>
+                                </td>
+                                <td className="py-1.5 px-2">
+                                  <div className="font-mono text-[9px] font-bold text-slate-800">
+                                    {med.batchNumber || "—"}
+                                  </div>
+                                  {med.expiryDate && (
+                                    <div className="text-[9px] text-slate-400">
+                                      Exp:{" "}
+                                      {new Date(med.expiryDate).toLocaleDateString(
+                                        "en-GB",
+                                        { month: "short", year: "numeric" }
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-1.5 px-2">
+                                  {outOfStock ? (
+                                    <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-100 text-red-700">
+                                      Out
+                                    </span>
+                                  ) : med.isLowStock ? (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
+                                      <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                                      {med.totalStock} left
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+                                      {med.totalStock.toLocaleString()}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 px-2.5 text-right">
+                                  {med.perOff && med.perOff > 0 ? (
+                                    <div>
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-[9px] text-slate-400 line-through">
+                                          Rs. {med.originalPrice?.toLocaleString() ?? med.sellingPrice.toLocaleString()}
+                                        </span>
+                                        <span className="px-1 py-0.2 rounded text-[8px] font-black bg-purple-100 text-purple-700">
+                                          {med.perOff}%
+                                        </span>
+                                      </div>
+                                      <div className="font-black text-emerald-700 text-xs whitespace-nowrap">
+                                        Rs. {med.sellingPrice.toLocaleString()}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="font-black text-slate-900 text-xs whitespace-nowrap">
+                                      Rs. {med.sellingPrice.toLocaleString()}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-1.5 px-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => addToCart(med)}
+                                    disabled={outOfStock}
+                                    className={`px-2.5 py-1 text-white rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-40 ${
+                                      isSurgical
+                                        ? "bg-sky-600 hover:bg-sky-700 shadow-sky-600/20 disabled:hover:bg-sky-600"
+                                        : "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20 disabled:hover:bg-amber-500"
+                                    }`}
+                                  >
+                                    + Add
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+
+                        {/* When not searching, show 3 items and clean empty prompt */}
+                        {!searchQuery.trim() && medicines.length > 0 && (
+                          <tr>
+                            <td colSpan={6} className="py-5 text-center bg-slate-50/60 border-t border-dashed border-slate-200">
+                              <div className="max-w-md mx-auto space-y-0.5">
+                                <p className="text-xs font-bold text-slate-700">
+                                  Showing 3 quick items
+                                </p>
+                                <p className="text-[10px] text-slate-400">
+                                  Type above and click &quot;Search&quot; to inspect all {catalogSummary.totalCombined} stock items.
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              {/* Medicines & Surgical Catalog - Tabular View (Shows 3 items by default, full list when searched) */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-3.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-amber-600" />
-                    <span>
-                      {searchQuery.trim()
-                        ? `Search Results (${medicines.length} matching items)`
-                        : `Dispensary & POS Complete Stock Directory (Showing 3 of ${catalogSummary.totalCombined})`}
-                    </span>
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    {searchQuery.trim()
-                      ? "Search matches displayed below"
-                      : "Type in search box above & hit search to filter all inventory"}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 shadow-xs">
-                      <tr>
-                        <th className="py-2.5 px-3">Item Name &amp; Spec</th>
-                        <th className="py-2.5 px-2">Type &amp; Category</th>
-                        <th className="py-2.5 px-2">Batch / Expiry</th>
-                        <th className="py-2.5 px-2">Stock Available</th>
-                        <th className="py-2.5 px-3 text-right">Price (Rs.)</th>
-                        <th className="py-2.5 px-3 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {medicines.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400">
-                            {loadingCatalog
-                              ? "Loading inventory catalog..."
-                              : `No medicine or surgical items found matching "${searchQuery}".`}
-                          </td>
-                        </tr>
-                      ) : (
-                        (searchQuery.trim() ? medicines : medicines.slice(0, 3)).map((med) => {
-                          const outOfStock = med.totalStock <= 0;
-                          const isSurgical = med.itemType === "SURGICAL";
-
-                          return (
-                            <tr
-                              key={med.id}
-                              className={`transition-colors ${
-                                outOfStock
-                                  ? "bg-slate-50/70 opacity-60"
-                                  : isSurgical
-                                  ? "hover:bg-sky-50/40"
-                                  : "hover:bg-amber-50/40"
-                              }`}
+              {/* RIGHT COLUMN: POS Terminal Cart & Cashier Calculator (5 Cols on Desktop, Sticky) */}
+              <div className="lg:col-span-5 xl:col-span-5 space-y-4 lg:sticky lg:top-4">
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-4">
+                  {/* Header: Title & Patient Identification */}
+                  <div className="flex flex-col gap-2.5 pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-amber-100 text-amber-800 rounded-lg">
+                          <ShoppingCart className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                          <span>POS Terminal Cart ({cart.length})</span>
+                          {cart.length > 0 && (
+                            <button
+                              onClick={() => setCart([])}
+                              className="text-xs text-red-600 hover:text-red-700 font-semibold underline"
                             >
-                              <td className="py-2.5 px-3">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-extrabold text-slate-900 text-xs">
-                                    {med.name}
-                                  </span>
-                                  {isSurgical ? (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-sky-100 text-sky-800 border border-sky-300">
-                                      <Scissors className="w-2.5 h-2.5" />
-                                      Surgical
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                      <Pill className="w-2.5 h-2.5" />
-                                      Medicine
-                                    </span>
-                                  )}
-                                  {med.isGeneric && (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      5% Generic
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-slate-500 font-medium">
-                                  {med.genericName}
-                                </p>
-                              </td>
-                              <td className="py-2.5 px-2">
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap ${
-                                    isSurgical
-                                      ? "bg-sky-50 text-sky-700 border border-sky-200"
-                                      : "bg-slate-100 text-slate-600 border border-slate-200"
-                                  }`}
-                                >
-                                  {med.category}
+                              Clear
+                            </button>
+                          )}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Patient Identification Badge */}
+                    <div>
+                      {linkedPatient ? (
+                        <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-2">
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                              {selectedToken && (
+                                <span className="w-4 h-4 rounded bg-indigo-600 text-white font-mono font-bold text-[8px] flex items-center justify-center shrink-0">
+                                  #{String(selectedToken.tokenNumber).padStart(2, "0")}
                                 </span>
+                              )}
+                              <span>{linkedPatient.name}</span>
+                              <span className="text-[10px] font-normal text-slate-500">
+                                ({linkedPatient.age ? `${linkedPatient.age}y` : ""} {linkedPatient.gender || ""})
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-mono text-blue-700 font-semibold mt-0.5">
+                              UID: {linkedPatient.patientUid} {linkedPatient.phone ? `• ${linkedPatient.phone}` : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">
+                              Linked
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLinkedPatient(null);
+                                setSelectedToken(null);
+                                setPatientUidInput("");
+                              }}
+                              className="text-[10px] text-red-600 font-bold hover:underline"
+                            >
+                              Unlink
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Patient UID or search..."
+                            value={patientUidInput}
+                            onChange={(e) => setPatientUidInput(e.target.value)}
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 flex-1 min-w-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleLookupPatient}
+                            disabled={patientLookupLoading || !patientUidInput.trim()}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold disabled:opacity-40 shrink-0"
+                          >
+                            {patientLookupLoading ? "..." : "Link"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Cart Items List - Compact Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-slate-50 text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 sticky top-0">
+                          <tr>
+                            <th className="py-1.5 px-2">Item</th>
+                            <th className="py-1.5 px-1.5 text-right">Price</th>
+                            <th className="py-1.5 px-1.5 text-center">Qty</th>
+                            <th className="py-1.5 px-2 text-right">Subtotal</th>
+                            <th className="py-1.5 px-1 text-center"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {cart.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                                Cart is empty. Click &quot;+ Add&quot; on medicines in the stock directory to dispense.
                               </td>
-                              <td className="py-2.5 px-2">
-                                <div className="font-mono text-[10px] font-bold text-slate-800">
-                                  {med.batchNumber || "—"}
+                            </tr>
+                          ) : (
+                            cart.map((item) => (
+                            <tr key={item.medicineId} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="py-1.5 px-2">
+                                <div className="font-extrabold text-slate-900 text-xs truncate max-w-[140px]" title={item.medicineName}>
+                                  {item.medicineName}
                                 </div>
-                                {med.expiryDate && (
-                                  <div className="text-[10px] text-slate-400">
-                                    Exp:{" "}
-                                    {new Date(med.expiryDate).toLocaleDateString(
-                                      "en-GB",
-                                      { month: "short", year: "numeric" }
-                                    )}
-                                  </div>
-                                )}
+                                <div className="text-[9px] text-slate-400 font-mono">
+                                  {item.batchNumber}
+                                </div>
                               </td>
-                              <td className="py-2.5 px-2">
-                                {outOfStock ? (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
-                                    Out of stock
-                                  </span>
-                                ) : med.isLowStock ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
-                                    <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                    {med.totalStock} left
-                                  </span>
-                                ) : (
-                                  <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
-                                    {med.totalStock.toLocaleString()} in stock
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                {med.perOff && med.perOff > 0 ? (
+                              <td className="py-1.5 px-1.5 text-right">
+                                {item.perOff && item.perOff > 0 ? (
                                   <div>
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <span className="text-[10px] text-slate-400 line-through">
-                                        Rs. {med.originalPrice?.toLocaleString() ?? med.sellingPrice.toLocaleString()}
-                                      </span>
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-700">
-                                        {med.perOff}% Off
-                                      </span>
-                                    </div>
-                                    <div className="font-black text-emerald-700 text-xs sm:text-sm whitespace-nowrap">
-                                      Rs. {med.sellingPrice.toLocaleString()}
-                                    </div>
+                                    <span className="text-[9px] text-slate-400 line-through block font-mono">
+                                      Rs. {item.originalPrice?.toLocaleString()}
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                      Rs. {item.unitPrice.toLocaleString()}
+                                    </span>
                                   </div>
                                 ) : (
-                                  <div className="font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
-                                    Rs. {med.sellingPrice.toLocaleString()}
-                                  </div>
+                                  <span className="font-mono font-bold text-slate-800 text-xs">
+                                    Rs. {item.unitPrice.toLocaleString()}
+                                  </span>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-center">
+                              <td className="py-1.5 px-1.5 text-center">
+                                <div className="inline-flex items-center gap-0.5 bg-white border border-slate-200 rounded p-0.5 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQuantity(item.medicineId, -1)}
+                                    className="p-0.5 hover:bg-slate-100 rounded text-slate-600"
+                                  >
+                                    <Minus className="w-2.5 h-2.5" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={item.maxStock}
+                                    value={typedQuantities[item.medicineId] ?? item.quantity}
+                                    onChange={(e) => handleTypedQuantityChange(item.medicineId, e.target.value)}
+                                    onBlur={() => handleTypedQuantityBlur(item.medicineId, item.maxStock)}
+                                    className="w-9 text-center text-xs font-black text-slate-900 font-mono py-0.5 px-0.5 bg-slate-50 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQuantity(item.medicineId, 1)}
+                                    className="p-0.5 hover:bg-slate-100 rounded text-slate-600"
+                                  >
+                                    <Plus className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="py-1.5 px-2 text-right font-mono font-black text-slate-900 text-xs whitespace-nowrap">
+                                Rs. {(item.quantity * item.unitPrice).toLocaleString()}
+                              </td>
+                              <td className="py-1.5 px-1 text-center">
                                 <button
                                   type="button"
-                                  onClick={() => addToCart(med)}
-                                  disabled={outOfStock}
-                                  className={`px-3 py-1 text-white rounded-lg text-xs font-bold transition-all shadow-sm disabled:opacity-40 ${
-                                    isSurgical
-                                      ? "bg-sky-600 hover:bg-sky-700 shadow-sky-600/20 disabled:hover:bg-sky-600"
-                                      : "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20 disabled:hover:bg-amber-500"
-                                  }`}
+                                  onClick={() => removeFromCart(item.medicineId)}
+                                  className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                  title="Remove item"
                                 >
-                                  + Add
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-
-                      {/* When not searching, show 3 items and clean empty prompt */}
-                      {!searchQuery.trim() && medicines.length > 0 && (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center bg-slate-50/60 border-t border-dashed border-slate-200">
-                            <div className="max-w-md mx-auto space-y-1">
-                              <p className="text-xs font-bold text-slate-700">
-                                Showing 3 quick items by default
-                              </p>
-                              <p className="text-[11px] text-slate-400">
-                                Type any medicine or surgical item in the search bar above and click &quot;Search&quot; to inspect any of the remaining {Math.max(0, catalogSummary.totalCombined - 3)} stock items.
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. BOTTOM SECTION: POS Terminal Cart (Horizontal Full-Width with Cashier Calculator) */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-5 w-full">
-              {/* Header: Title & Patient Identification */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl">
-                    <ShoppingCart className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
-                      <span>POS Terminal Cart ({cart.length})</span>
-                      {cart.length > 0 && (
-                        <button
-                          onClick={() => setCart([])}
-                          className="text-xs text-red-600 hover:text-red-700 font-semibold underline ml-2"
-                        >
-                          Clear All Items
-                        </button>
-                      )}
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Dispensary items currently queued for sales checkout and receipt printing.
-                    </p>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                {/* Patient Identification Badge */}
-                <div className="flex items-center gap-2">
-                  {linkedPatient ? (
-                    <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                          {selectedToken && (
-                            <span className="w-5 h-5 rounded-md bg-indigo-600 text-white font-mono font-bold text-[9px] flex items-center justify-center shrink-0">
-                              #{String(selectedToken.tokenNumber).padStart(2, "0")}
-                            </span>
-                          )}
-                          <span>{linkedPatient.name}</span>
-                          <span className="text-[10px] font-normal text-slate-500">
-                            ({linkedPatient.age ? `${linkedPatient.age}y` : ""} {linkedPatient.gender || ""})
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-mono text-blue-700 font-semibold mt-0.5">
-                          UID: {linkedPatient.patientUid} {linkedPatient.phone ? `• ${linkedPatient.phone}` : ""}
-                        </div>
+                  {/* Cashier Calculator Section */}
+                  <div className="bg-slate-900 text-white p-4 rounded-xl space-y-3 shadow-md w-full">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                          Cashier Calculator
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          Cash Tender
+                        </span>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Linked
+                      <span className="text-[10px] font-mono text-cyan-400">
+                        Dispensary Sale
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLinkedPatient(null);
-                          setSelectedToken(null);
-                          setPatientUidInput("");
-                        }}
-                        className="text-[10px] text-red-600 font-bold hover:underline"
-                      >
-                        Unlink
-                      </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Or custom Patient UID..."
-                        value={patientUidInput}
-                        onChange={(e) => setPatientUidInput(e.target.value)}
-                        className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500 w-44"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleLookupPatient}
-                        disabled={patientLookupLoading || !patientUidInput.trim()}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold disabled:opacity-40"
-                      >
-                        {patientLookupLoading ? "..." : "Link"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Cart Items List - Full Width Horizontal Layout */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="py-2.5 px-3">Item Details</th>
-                      <th className="py-2.5 px-2">Batch #</th>
-                      <th className="py-2.5 px-2 text-right">Unit Price</th>
-                      <th className="py-2.5 px-3 text-center">Quantity</th>
-                      <th className="py-2.5 px-3 text-right">Subtotal</th>
-                      <th className="py-2.5 px-2 text-center">Remove</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {cart.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
-                          Cart is empty (0 items). Click &quot;+ Add&quot; on medicines in the stock directory above to dispense.
-                        </td>
-                      </tr>
-                    ) : (
-                      cart.map((item) => (
-                        <tr key={item.medicineId} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-slate-900 text-xs">
-                                {item.medicineName}
-                              </span>
-                              {item.itemType === "SURGICAL" ? (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
-                                  SURGICAL
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                  MEDICINE
-                                </span>
-                              )}
-                              {item.isGeneric && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  5% Off
-                                </span>
-                              )}
+                    {/* Prominent OPD Token Link Banner if Token is Attached */}
+                    {selectedToken && (
+                      <div className="p-2.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/40 rounded-lg space-y-1 shadow-inner">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-mono font-black text-xs flex items-center justify-center shrink-0">
+                              #{String(selectedToken.tokenNumber).padStart(2, "0")}
                             </div>
-                            <div className="text-[10px] text-slate-500 font-medium">
-                              {item.genericName}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-2 font-mono text-[10px] text-slate-600">
-                            {item.batchNumber}
-                          </td>
-                          <td className="py-2.5 px-2 text-right">
-                            {item.perOff && item.perOff > 0 ? (
-                              <div>
-                                <span className="text-[10px] text-slate-400 line-through block font-mono">
-                                  Rs. {item.originalPrice?.toLocaleString()}
-                                </span>
-                                <span className="font-mono font-bold text-emerald-700">
-                                  Rs. {item.unitPrice.toLocaleString()}
-                                </span>
-                                <span className="ml-1 text-[9px] font-black text-purple-700 bg-purple-100 px-1 py-0.2 rounded">
-                                  {item.perOff}%
-                                </span>
+                            <div>
+                              <div className="text-[11px] font-black text-white flex items-center gap-1.5">
+                                <span>TOKEN #{String(selectedToken.tokenNumber).padStart(2, "0")} LINKED</span>
                               </div>
-                            ) : (
-                              <span className="font-mono font-bold text-slate-800">
-                                Rs. {item.unitPrice.toLocaleString()}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.medicineId, -1)}
-                                className="p-1 hover:bg-slate-100 rounded text-slate-600"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="px-2 text-xs font-black text-slate-900 font-mono">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updateQuantity(item.medicineId, 1)}
-                                className="p-1 hover:bg-slate-100 rounded text-slate-600"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
+                              <p className="text-[10px] text-slate-300 truncate max-w-[170px]">
+                                {linkedPatient?.name || "Walk-in Patient"}
+                              </p>
                             </div>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 text-xs">
-                            Rs. {(item.quantity * item.unitPrice).toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeFromCart(item.medicineId)}
-                              className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                              title="Remove item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Cashier Calculator Section (Styled to match Receptionist Cashier Calculator) */}
-              <div className="bg-slate-900 text-white p-6 rounded-2xl space-y-4 shadow-md w-full">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                      Cashier Calculator
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                      Cash Tender Only Editable
-                    </span>
-                  </div>
-                  <span className="text-xs font-mono text-cyan-400">
-                    Official Pharmacy POS Sequential Sale
-                  </span>
-                </div>
-
-                {/* Prominent OPD Token Link Banner if Token is Attached */}
-                {selectedToken && (
-                  <div className="p-3.5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/40 rounded-xl space-y-2 shadow-inner">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-mono font-black text-sm flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/40 border border-indigo-400/40">
-                          #{String(selectedToken.tokenNumber).padStart(2, "0")}
-                        </div>
-                        <div>
-                          <div className="text-xs font-black text-white flex items-center gap-2">
-                            <span>OPD TOKEN #{String(selectedToken.tokenNumber).padStart(2, "0")} LINKED</span>
-                            <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-700/60">
-                              Patient Active
+                          </div>
+                          <div className="text-right shrink-0 bg-slate-800/90 px-2 py-1 rounded border border-slate-700">
+                            <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 block">Due</span>
+                            <span className="text-xs font-mono font-black text-cyan-400">
+                              Rs. {netPayable.toLocaleString()}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-300 mt-0.5">
-                            Customer: <strong className="text-white">{linkedPatient?.name || "Walk-in Patient"}</strong> ({linkedPatient?.patientUid || "N/A"}). Net pharmacy cash due: <strong className="text-cyan-400">Rs. {netPayable.toLocaleString()}</strong>.
-                          </p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 bg-slate-800/90 px-3 py-1.5 rounded-lg border border-slate-700">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Due</span>
-                        <span className="text-base font-mono font-black text-cyan-400">
+                    )}
+
+                    {/* 3 Calculator Inputs: Subtotal (locked), Discount (locked), Cash Tendered (editable) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {/* 1. Subtotal Billed (NON-EDITABLE) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="text-[10px] font-medium text-slate-400">
+                            Subtotal Gross
+                          </label>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase flex items-center gap-0.5">
+                            <Lock className="w-2 h-2" />
+                            <span>Lock</span>
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            disabled
+                            value={`Rs. ${rawSubtotal.toLocaleString()}`}
+                            className="w-full bg-slate-800/80 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs font-extrabold text-slate-200 cursor-not-allowed select-none pl-6"
+                          />
+                          <Lock className="w-3 h-3 text-slate-500 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      {/* 2. Total Generic / Promotional Discount (NON-EDITABLE) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="text-[10px] font-medium text-slate-400">
+                            Discount
+                          </label>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase flex items-center gap-0.5">
+                            <Lock className="w-2 h-2" />
+                            <span>Auto</span>
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            disabled
+                            value={`- Rs. ${genericDiscountTotal.toLocaleString()}`}
+                            className="w-full bg-slate-800/80 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs font-extrabold text-purple-400 cursor-not-allowed select-none pl-6"
+                          />
+                          <Tag className="w-3 h-3 text-purple-500 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      {/* 3. Cash Tendered (ONLY EDITABLE CASHIER INPUT) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="text-[10px] font-bold text-amber-400">
+                            Cash Received *
+                          </label>
+                          <span className="text-[8px] font-bold text-emerald-400 uppercase">
+                            Editable
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-400 pointer-events-none">
+                            Rs.
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="0"
+                            value={cashTendered === 0 ? "" : cashTendered}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setCashTendered(isNaN(val) ? 0 : Math.max(0, val));
+                            }}
+                            className="w-full bg-slate-800 border-2 border-amber-500/80 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-white focus:outline-none transition-all placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Tender Suggestions */}
+                    {netPayable > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                        <span className="text-[9px] text-slate-400 font-medium">Quick Cash:</span>
+                        {[
+                          netPayable,
+                          Math.ceil(netPayable / 50) * 50,
+                          Math.ceil(netPayable / 100) * 100,
+                          Math.ceil(netPayable / 500) * 500,
+                          Math.ceil(netPayable / 1000) * 1000,
+                        ]
+                          .filter((v, i, a) => v >= netPayable && a.indexOf(v) === i)
+                          .slice(0, 4)
+                          .map((val) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setCashTendered(val)}
+                              className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border transition-all ${
+                                cashTendered === val
+                                  ? "bg-amber-500 text-white border-amber-400"
+                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                              }`}
+                            >
+                              Rs. {val.toLocaleString()}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Live Balance / Change Return Banner */}
+                    <div className="p-2.5 bg-slate-800/90 rounded-lg flex items-center justify-between text-xs font-bold border border-slate-700">
+                      <div>
+                        <span className="text-slate-400 text-[10px]">Net Payable:</span>
+                        <span className="ml-1 text-sm font-black text-white font-mono">
                           Rs. {netPayable.toLocaleString()}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3 Calculator Inputs: Subtotal (locked), Discount (locked), Cash Tendered (editable) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* 1. Subtotal Billed (NON-EDITABLE) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-medium text-slate-400">
-                        Subtotal Gross Billed (Rs.)
-                      </label>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-0.5">
-                        <Lock className="w-2.5 h-2.5" />
-                        <span>Locked</span>
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={`Rs. ${rawSubtotal.toLocaleString()}`}
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-extrabold text-slate-200 cursor-not-allowed select-none pl-8"
-                      />
-                      <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {cart.length} item(s) in cart
-                    </p>
-                  </div>
-
-                  {/* 2. Generic 5% Discount (NON-EDITABLE) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-medium text-slate-400">
-                        Generic 5% Discount (Rs.)
-                      </label>
-                      <span className="text-[9px] font-bold text-emerald-400 uppercase flex items-center gap-0.5">
-                        <Check className="w-2.5 h-2.5" />
-                        <span>Applied</span>
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={
-                          genericDiscountTotal > 0
-                            ? `- Rs. ${genericDiscountTotal.toLocaleString()}`
-                            : "Rs. 0 (No Generic Items)"
-                        }
-                        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-extrabold text-emerald-400 cursor-not-allowed select-none pl-8"
-                      />
-                      <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Auto-calculated from generic medicines
-                    </p>
-                  </div>
-
-                  {/* 3. Cash Tendered (ONLY EDITABLE FIELD) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-bold text-cyan-300">
-                        Cash Tendered Now (Rs.) *
-                      </label>
-                      <span className="text-[9px] font-black uppercase text-cyan-400 bg-cyan-950 px-1.5 py-0.2 rounded border border-cyan-800">
-                        Editable
-                      </span>
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      step="50"
-                      value={cashTendered || ""}
-                      onChange={(e) => setCashTendered(parseFloat(e.target.value) || 0)}
-                      placeholder="Amount received"
-                      className="w-full bg-slate-800 border-2 border-cyan-400/90 focus:border-cyan-300 rounded-xl px-3 py-2 text-sm font-black text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-inner"
-                    />
-                    <p className="text-[10px] text-cyan-400/80 mt-1">
-                      Physical cash handed over by customer
-                    </p>
-                  </div>
-                </div>
-
-                {/* Quick Cash Tender Shortcut Buttons */}
-                <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 mr-1">
-                    Quick Tender:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCashTendered(netPayable)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700 hover:bg-cyan-900 transition-colors"
-                  >
-                    Exact (Rs. {netPayable.toLocaleString()})
-                  </button>
-                  {[50, 100, 200, 500, 1000, 2000, 5000].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setCashTendered(amt)}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors"
-                    >
-                      Rs. {amt.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Summary Bar */}
-                <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm">
-                  <div>
-                    <span className="text-slate-400">Net Due Now:</span>
-                    <span className="ml-2 text-lg sm:text-xl font-black text-white">
-                      Rs. {netPayable.toLocaleString()}
-                    </span>
-                    <span className="ml-2 text-xs text-slate-400 font-mono">
-                      (Gross: Rs. {rawSubtotal.toLocaleString()} · Disc: Rs. {genericDiscountTotal.toLocaleString()})
-                    </span>
-                  </div>
-
-                  <div>
-                    {cashTendered >= netPayable ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-slate-400">Change Due:</span>
-                        <span className="ml-1 text-base sm:text-lg font-black text-emerald-400">
-                          Rs. {changeToReturn.toLocaleString()}
-                        </span>
+                      <div>
+                        {cashTendered >= netPayable ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 text-[10px]">Change:</span>
+                            <span className="ml-1 text-sm font-black text-emerald-400 font-mono">
+                              Rs. {changeToReturn.toLocaleString()}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-rose-400">
+                            <span className="text-[10px] font-semibold">Short:</span>
+                            <span className="font-bold text-xs font-mono">
+                              Rs. {(netPayable - cashTendered).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-rose-400">
-                        <span className="text-xs font-semibold">Short by:</span>
-                        <span className="font-bold text-sm">
-                          Rs. {(netPayable - cashTendered).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Action Button: Center Aligned */}
-                <div className="flex items-center justify-center pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCheckout}
-                    disabled={cart.length === 0 || checkingOut}
-                    className="w-full sm:w-auto min-w-[340px] max-w-xl py-4 px-8 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-3 shadow-xl shadow-amber-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    <Printer className="w-5 h-5" />
-                    <span>
-                      {checkingOut
-                        ? "Processing Dispensary Sale..."
-                        : cart.length > 0
-                        ? `Dispense & Print POS Receipt (Collect: Rs. ${netPayable.toLocaleString()})`
-                        : "⚠️ Cart is Empty (Select Medicines Above)"}
-                    </span>
-                  </button>
+                    {/* Action Button */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCheckout}
+                        disabled={cart.length === 0 || checkingOut}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>
+                          {checkingOut
+                            ? "Processing Sale..."
+                            : cart.length > 0
+                            ? `Dispense & Print (Rs. ${netPayable.toLocaleString()})`
+                            : "⚠️ Cart is Empty"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2798,6 +2892,16 @@ export default function PharmacistPortal() {
             </div>
             )}
           </div>
+        )}
+
+        {/* TAB: MEDICINE RETURNS */}
+        {activeTab === "returns" && (
+          <PharmacyMedicineReturnsView
+            onStockUpdated={() => {
+              fetchMedicines();
+              fetchDailyStats();
+            }}
+          />
         )}
 
         {/* TAB 3: DAILY SALES & ACCOUNTABILITY */}

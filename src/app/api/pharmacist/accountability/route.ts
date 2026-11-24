@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const isSuperAdmin = session.user.role === "ADMIN" && searchParams.get("all") === "true";
   const userFilter = isSuperAdmin ? {} : { userId: session.user.id };
 
-  const [sales, invoices, drawerAdjustments, expenditures] = await Promise.all([
+  const [sales, invoices, drawerAdjustments, expenditures, medicineReturns] = await Promise.all([
     prisma.pharmacySale.findMany({
       where: {
         ...userFilter,
@@ -105,6 +105,36 @@ export async function GET(req: NextRequest) {
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+
+    // Medicine returns for the target shift date
+    prisma.medicineReturn.findMany({
+      where: {
+        ...(isSuperAdmin ? {} : { processedById: session.user.id }),
+        createdAt: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        items: {
+          include: {
+            medicine: true,
+          },
+        },
+        sale: {
+          include: {
+            patient: true,
+          },
+        },
+        processedBy: {
+          select: { id: true, name: true, role: true },
+        },
+        approvedBy: {
+          select: { id: true, name: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -309,8 +339,13 @@ export async function GET(req: NextRequest) {
   // Expenditures total
   const totalExpenditures = expenditures.reduce((acc, exp) => acc + exp.amount, 0);
 
-  // Net Expected System Cash
-  const netDrawerCash = totalRevenue + approvedCashIn - approvedCashOut - totalExpenditures;
+  // Medicine returns total (refunds deducted from cash)
+  const totalReturnsRefund = medicineReturns.reduce((acc, ret) => acc + (ret.status !== "REJECTED" ? ret.totalRefundAmount : 0), 0);
+  const pendingReturnsRefund = medicineReturns.reduce((acc, ret) => acc + (ret.status === "PENDING_CLOSING" ? ret.totalRefundAmount : 0), 0);
+  const approvedReturnsRefund = medicineReturns.reduce((acc, ret) => acc + (ret.status === "APPROVED" ? ret.totalRefundAmount : 0), 0);
+
+  // Net Expected System Cash (Sales Revenue - Refunds - Expenditures + Net Approved Drawer In/Out)
+  const netDrawerCash = totalRevenue - totalReturnsRefund + approvedCashIn - approvedCashOut - totalExpenditures;
   const totalSystemCash = Math.max(0, netDrawerCash);
 
   // Check active shift closing record for today
@@ -372,9 +407,14 @@ export async function GET(req: NextRequest) {
       totalExpenditures,
       approvedCashIn,
       approvedCashOut,
+      totalReturnsRefund,
+      pendingReturnsRefund,
+      approvedReturnsRefund,
+      returnsCount: medicineReturns.length,
     },
     activeClosing,
     pastClosings,
+    medicineReturns,
     invoices,
     expenditures,
     drawerAdjustments,

@@ -8,10 +8,48 @@
     --foreground: 222.2 84% 4.9%;
   }
 
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+/* =========================================================================
+   Standard Responsive Table Container with Horizontal Scroll & Touch Hints
+   ========================================================================= */
+.hms-table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.hms-table-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Scrollbar polish for smooth data scrolling */
+.hms-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+.hms-table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+.hms-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.hms-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* =========================================================================

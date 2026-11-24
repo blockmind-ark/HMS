@@ -115,10 +115,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Expected cash in drawer
+    // 4. Fetch medicine returns refunds for the target date
+    const medicineReturns = await prisma.medicineReturn.findMany({
+      where: {
+        processedById: session.user.id,
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        status: { not: "REJECTED" },
+      },
+    });
+
+    const totalReturnsRefund = medicineReturns.reduce((sum, r) => sum + r.totalRefundAmount, 0);
+
+    // Expected cash in drawer (Revenue - Returns - Expenditures + Drawer Net)
     const expectedCashInDrawer = Math.max(
       0,
-      totalRevenue + approvedCashIn - approvedCashOut - totalExpenditures
+      totalRevenue - totalReturnsRefund + approvedCashIn - approvedCashOut - totalExpenditures
     );
     const variance = numericCounted - expectedCashInDrawer;
 
@@ -171,6 +182,19 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+    // Link all unlinked medicine returns for this pharmacist and shiftDate to this closing sheet
+    await prisma.medicineReturn.updateMany({
+      where: {
+        processedById: session.user.id,
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        dailyClosingId: null,
+      },
+      data: {
+        dailyClosingId: closing.id,
+        closingDate: startOfDay,
+      },
+    });
 
     const varianceText =
       variance === 0

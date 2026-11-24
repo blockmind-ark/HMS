@@ -18,6 +18,7 @@ import {
   Stethoscope,
   Briefcase,
   Users,
+  Lock,
 } from "lucide-react";
 
 export function DoctorSelfServicePayrollView() {
@@ -256,11 +257,17 @@ export function DoctorSelfServicePayrollView() {
                             {att.dateStr}
                           </td>
                           <td className="px-4 py-3.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${badgeClasses}`}
-                            >
-                              {att.status.replace("_", " ")}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${badgeClasses}`}
+                              >
+                                {att.status.replace("_", " ")}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                <Lock className="w-2.5 h-2.5 text-slate-400" />
+                                <span>Locked</span>
+                              </span>
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-slate-600">
                             {att.notes || <span className="text-slate-400 italic">Regular shift</span>}

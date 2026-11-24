@@ -57,6 +57,37 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
+  // 2b. Fetch Pharmacy Medicine Returns for target date
+  const medicineReturns = await prisma.medicineReturn.findMany({
+    where: {
+      status: { not: "REJECTED" },
+      OR: [
+        {
+          createdAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        {
+          closingDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      ],
+    },
+    include: {
+      items: {
+        include: {
+          medicine: true,
+        },
+      },
+      processedBy: { select: { id: true, name: true, email: true } },
+      approvedBy: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   // 3. Fetch Expenditures and Shift Closings for target date
   const [expenditures, shiftClosings] = await Promise.all([
     prisma.expenditure.findMany({
@@ -122,9 +153,9 @@ export async function GET(req: NextRequest) {
   }
 
   // 4. Pharmacy Calculations
-  let pharmacyNet = 0;
-  let pharmacyDiscounts = 0;
   let pharmacyGross = 0;
+  let pharmacyDiscounts = 0;
+  let pharmacySalesTotal = 0;
   let pharmacyCOGS = 0;
 
   const formattedPharmacySales = pharmacySales.map((sale) => {
@@ -138,7 +169,7 @@ export async function GET(req: NextRequest) {
       return `${item.medicine.name} (x${item.quantity})`;
     });
 
-    pharmacyNet += sale.totalAmount;
+    pharmacySalesTotal += sale.totalAmount;
     pharmacyDiscounts += sale.discount;
     pharmacyGross += sale.totalAmount + sale.discount;
     pharmacyCOGS += saleCOGS;
@@ -162,6 +193,20 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // Calculate return refunds to deduct from pharmacy net
+  const totalReturnsRefund = medicineReturns.reduce(
+    (sum, ret) => sum + (ret.totalRefundAmount || 0),
+    0
+  );
+  const pendingReturnsRefund = medicineReturns
+    .filter((ret) => ret.status === "PENDING_CLOSING")
+    .reduce((sum, ret) => sum + (ret.totalRefundAmount || 0), 0);
+  const approvedReturnsRefund = medicineReturns
+    .filter((ret) => ret.status === "APPROVED")
+    .reduce((sum, ret) => sum + (ret.totalRefundAmount || 0), 0);
+
+  // Pharmacy Net is total sales minus customer returns refunded
+  const pharmacyNet = Math.max(0, pharmacySalesTotal - totalReturnsRefund);
   const pharmacyNetProfit = Math.max(0, pharmacyNet - pharmacyCOGS);
   const pharmacyProfitMargin =
     pharmacyNet > 0 ? ((pharmacyNetProfit / pharmacyNet) * 100).toFixed(1) : "0";
@@ -186,11 +231,16 @@ export async function GET(req: NextRequest) {
       clinicalCount: clinicalInvoices.length,
       pharmacyNet,
       pharmacyGross,
+      pharmacySalesTotal,
       pharmacyDiscounts,
       pharmacyCount: pharmacySales.length,
       pharmacyCOGS,
       pharmacyNetProfit,
       pharmacyProfitMargin,
+      totalReturnsRefund,
+      pendingReturnsRefund,
+      approvedReturnsRefund,
+      returnsCount: medicineReturns.length,
       combinedNet,
       combinedGross,
       combinedDiscounts,
@@ -217,6 +267,26 @@ export async function GET(req: NextRequest) {
       status: inv.status,
     })),
     pharmacySales: formattedPharmacySales,
+    medicineReturns: medicineReturns.map((ret) => ({
+      id: ret.id,
+      returnNumber: ret.returnNumber,
+      createdAt: ret.createdAt,
+      closingDate: ret.closingDate,
+      invoiceNumber: ret.invoiceNumber,
+      saleNumber: ret.invoiceNumber,
+      customerName: ret.patientName || "Walk-in Customer",
+      patientName: ret.patientName || "Walk-in Customer",
+      reason: ret.reason,
+      totalRefundAmount: ret.totalRefundAmount,
+      status: ret.status,
+      processedByName: ret.processedBy.name,
+      approvedByName: ret.approvedBy?.name || null,
+      approvedAt: ret.approvedAt,
+      itemsSummary: ret.items
+        .map((it) => `${it.medicine.name} (x${it.quantityReturned})`)
+        .join(", "),
+      itemCount: ret.items.length,
+    })),
   });
 }
 

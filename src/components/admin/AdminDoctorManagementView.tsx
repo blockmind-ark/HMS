@@ -23,6 +23,9 @@ import {
   ChevronDown,
   Layers,
   Award,
+  Lock,
+  ShieldAlert,
+  Check,
 } from "lucide-react";
 import {
   DoctorInputSchema,
@@ -65,6 +68,9 @@ export function AdminDoctorManagementView() {
   const [attendanceList, setAttendanceList] = useState<any[]>([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [markingAttendance, setMarkingAttendance] = useState(false);
+  const [stagedAttendance, setStagedAttendance] = useState<Record<string, string>>({});
+  const [showAttendanceConfirmModal, setShowAttendanceConfirmModal] = useState(false);
+  const [attendanceTargetDoctor, setAttendanceTargetDoctor] = useState<{ id: string; name: string; status: string } | null>(null);
 
   // Modals - Leave
   const [showLeaveModal, setShowLeaveModal] = useState(false);
@@ -315,28 +321,101 @@ export function AdminDoctorManagementView() {
   };
 
   // -------------------------------------------------------------
-  // Attendance Handler
+  // Attendance Handler (Confirmation Modal - No native alerts)
   // -------------------------------------------------------------
-  const handleMarkAttendance = async (doctorId: string, status: string) => {
+  const handleStageAttendance = (doctorId: string, status: string) => {
+    setStagedAttendance((prev) => ({
+      ...prev,
+      [doctorId]: status,
+    }));
+  };
+
+  const promptConfirmSingleDoctor = (doctorId: string, doctorName: string, status: string) => {
+    setAttendanceTargetDoctor({ id: doctorId, name: doctorName, status });
+    setShowAttendanceConfirmModal(true);
+  };
+
+  const promptConfirmBatch = () => {
+    setAttendanceTargetDoctor(null);
+    setShowAttendanceConfirmModal(true);
+  };
+
+  const executeConfirmSaveAttendance = async () => {
     setMarkingAttendance(true);
     try {
-      const res = await fetch("/api/admin/doctors/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctorId,
-          dateStr: attendanceDate,
-          status,
-          checkInTime: status === "PRESENT" ? "09:00 AM" : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setFeedback({ type: "success", message: data.message || "Attendance updated." });
-        fetchAttendance(attendanceDate);
+      if (attendanceTargetDoctor) {
+        // Save single target doctor
+        const res = await fetch("/api/admin/doctors/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            doctorId: attendanceTargetDoctor.id,
+            dateStr: attendanceDate,
+            status: attendanceTargetDoctor.status,
+            checkInTime: attendanceTargetDoctor.status === "PRESENT" ? "09:00 AM" : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to mark attendance");
+
+        setFeedback({
+          type: "success",
+          message: data.message || `Attendance finalized and permanently locked for Dr. ${attendanceTargetDoctor.name}.`,
+        });
+
+        setStagedAttendance((prev) => {
+          const next = { ...prev };
+          delete next[attendanceTargetDoctor.id];
+          return next;
+        });
       } else {
-        throw new Error(data.error || "Failed to mark attendance");
+        // Batch save all staged doctors who are not already recorded
+        const doctorIdsToSave = Object.keys(stagedAttendance).filter((id) => {
+          const rec = attendanceList.find((a) => a.doctorId === id);
+          return !rec;
+        });
+
+        if (doctorIdsToSave.length === 0) {
+          throw new Error("No pending doctor attendances selected to save.");
+        }
+
+        let successCount = 0;
+        let lastError = "";
+
+        for (const doctorId of doctorIdsToSave) {
+          const status = stagedAttendance[doctorId] || "PRESENT";
+          const res = await fetch("/api/admin/doctors/attendance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              doctorId,
+              dateStr: attendanceDate,
+              status,
+              checkInTime: status === "PRESENT" ? "09:00 AM" : undefined,
+            }),
+          });
+          if (res.ok) {
+            successCount++;
+          } else {
+            const errData = await res.json();
+            lastError = errData.error || "Failed to save attendance";
+          }
+        }
+
+        if (successCount > 0) {
+          setFeedback({
+            type: "success",
+            message: `Successfully finalized and locked attendance for ${successCount} doctor(s) on ${attendanceDate}.`,
+          });
+          setStagedAttendance({});
+        } else {
+          throw new Error(lastError || "Failed to save attendance batch.");
+        }
       }
+
+      setShowAttendanceConfirmModal(false);
+      setAttendanceTargetDoctor(null);
+      fetchAttendance(attendanceDate);
     } catch (e: any) {
       setFeedback({ type: "error", message: e.message });
     } finally {
@@ -345,12 +424,12 @@ export function AdminDoctorManagementView() {
   };
 
   // -------------------------------------------------------------
-  // Leave Handler
+  // Leave Handler (No native alert)
   // -------------------------------------------------------------
   const handleSaveLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveForm.doctorId) {
-      alert("Please choose a doctor.");
+      setFeedback({ type: "error", message: "Please choose a doctor before recording leave." });
       return;
     }
 
@@ -465,54 +544,56 @@ export function AdminDoctorManagementView() {
       </div>
 
       {/* Sub-Tab Navigation Bar */}
-      <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto">
-        <button
-          onClick={() => setSubTab("directory")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            subTab === "directory"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          <Briefcase className="w-4 h-4" />
-          <span>Doctor Directory &amp; Terms ({doctors.length})</span>
-        </button>
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-sm overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 min-w-max pb-0.5">
+          <button
+            onClick={() => setSubTab("directory")}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap min-h-[38px] ${
+              subTab === "directory"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <Briefcase className="w-4 h-4 shrink-0" />
+            <span>Doctor Directory ({doctors.length})</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("attendance")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            subTab === "attendance"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Attendance &amp; Leaves</span>
-        </button>
+          <button
+            onClick={() => setSubTab("attendance")}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap min-h-[38px] ${
+              subTab === "attendance"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <Calendar className="w-4 h-4 shrink-0" />
+            <span>Attendance &amp; Leaves</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("analytics")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            subTab === "analytics"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span>Patient Visit Metrics (D / W / Y)</span>
-        </button>
+          <button
+            onClick={() => setSubTab("analytics")}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap min-h-[38px] ${
+              subTab === "analytics"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 shrink-0" />
+            <span>Patient Visit Metrics (D/W/Y)</span>
+          </button>
 
-        <button
-          onClick={() => setSubTab("payroll")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            subTab === "payroll"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          <DollarSign className="w-4 h-4" />
-          <span>Dynamic Payroll &amp; Bonuses</span>
-        </button>
+          <button
+            onClick={() => setSubTab("payroll")}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap min-h-[38px] ${
+              subTab === "payroll"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <DollarSign className="w-4 h-4 shrink-0" />
+            <span>Dynamic Payroll &amp; Bonuses</span>
+          </button>
+        </div>
       </div>
 
       {/* Feedback Alert */}
@@ -675,11 +756,25 @@ export function AdminDoctorManagementView() {
             </div>
           </div>
 
+          {/* Audit Immutability Policy Banner */}
+          <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3 text-amber-950">
+            <Lock className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-xs">
+              <p className="font-extrabold uppercase tracking-wide text-amber-900">
+                🔒 Permanent Attendance Lock Policy (Audit Constraint)
+              </p>
+              <p className="text-amber-800">
+                When an administrator marks and saves attendance for a doctor for any given date, that record becomes <strong>permanently locked in PostgreSQL</strong> and cannot be altered, edited, or re-saved. Please verify before marking.
+              </p>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Desktop & Tablet View: Structured Horizontal Table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">
                     <th className="px-5 py-3.5">Doctor</th>
                     <th className="px-5 py-3.5">Specialization</th>
                     <th className="px-5 py-3.5">Status on {attendanceDate}</th>
@@ -689,75 +784,108 @@ export function AdminDoctorManagementView() {
                 <tbody className="divide-y divide-slate-100">
                   {doctors.map((doc) => {
                     const rec = attendanceList.find((a) => a.doctorId === doc.id);
+                    const isRecorded = Boolean(rec);
                     const status = rec?.status || "NOT_MARKED";
                     return (
                       <tr key={doc.id} className="hover:bg-slate-50/60">
-                        <td className="px-5 py-3.5 font-bold text-slate-900">{doc.name}</td>
-                        <td className="px-5 py-3.5 text-slate-500">{doc.specialization}</td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              status === "PRESENT"
-                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                : status === "ABSENT"
-                                ? "bg-rose-100 text-rose-800 border border-rose-300"
-                                : status === "LEAVE"
-                                ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                : status === "HALF_DAY"
-                                ? "bg-indigo-100 text-indigo-800 border border-indigo-300"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {status}
-                          </span>
+                        <td className="px-5 py-3.5 font-bold text-slate-900 whitespace-nowrap">{doc.name}</td>
+                        <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{doc.specialization}</td>
+                        <td className="px-5 py-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                status === "PRESENT"
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                  : status === "ABSENT"
+                                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                  : status === "LEAVE"
+                                  ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                  : status === "HALF_DAY"
+                                  ? "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              {status}
+                            </span>
+                            {isRecorded && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                <Lock className="w-2.5 h-2.5 text-slate-500" />
+                                <span>Locked</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => handleMarkAttendance(doc.id, "PRESENT")}
-                              disabled={markingAttendance}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                                status === "PRESENT"
-                                  ? "bg-emerald-600 text-white border-emerald-700"
-                                  : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                              }`}
-                            >
-                              Present
-                            </button>
-                            <button
-                              onClick={() => handleMarkAttendance(doc.id, "HALF_DAY")}
-                              disabled={markingAttendance}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                                status === "HALF_DAY"
-                                  ? "bg-indigo-600 text-white border-indigo-700"
-                                  : "bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50"
-                              }`}
-                            >
-                              Half-Day
-                            </button>
-                            <button
-                              onClick={() => handleMarkAttendance(doc.id, "LEAVE")}
-                              disabled={markingAttendance}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                                status === "LEAVE"
-                                  ? "bg-amber-600 text-white border-amber-700"
-                                  : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
-                              }`}
-                            >
-                              Leave
-                            </button>
-                            <button
-                              onClick={() => handleMarkAttendance(doc.id, "ABSENT")}
-                              disabled={markingAttendance}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                                status === "ABSENT"
-                                  ? "bg-rose-600 text-white border-rose-700"
-                                  : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
-                              }`}
-                            >
-                              Absent
-                            </button>
-                          </div>
+                          {isRecorded ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 w-fit">
+                              <Lock className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Saved &bull; Cannot be changed</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {(() => {
+                                const currentStaged = stagedAttendance[doc.id] || "PRESENT";
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStageAttendance(doc.id, "PRESENT")}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                          currentStaged === "PRESENT"
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "text-slate-600 hover:bg-white"
+                                        }`}
+                                      >
+                                        Present
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStageAttendance(doc.id, "HALF_DAY")}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                          currentStaged === "HALF_DAY"
+                                            ? "bg-indigo-600 text-white shadow-xs"
+                                            : "text-slate-600 hover:bg-white"
+                                        }`}
+                                      >
+                                        Half-Day
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStageAttendance(doc.id, "LEAVE")}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                          currentStaged === "LEAVE"
+                                            ? "bg-amber-600 text-white shadow-xs"
+                                            : "text-slate-600 hover:bg-white"
+                                        }`}
+                                      >
+                                        Leave
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStageAttendance(doc.id, "ABSENT")}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                          currentStaged === "ABSENT"
+                                            ? "bg-rose-600 text-white shadow-xs"
+                                            : "text-slate-600 hover:bg-white"
+                                        }`}
+                                      >
+                                        Absent
+                                      </button>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => promptConfirmSingleDoctor(doc.id, doc.name, currentStaged)}
+                                      disabled={markingAttendance}
+                                      className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-extrabold transition-colors shadow-2xs"
+                                    >
+                                      Save
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -765,6 +893,166 @@ export function AdminDoctorManagementView() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile View: Vertical Stacked Key-Value Cards */}
+            <div className="block md:hidden p-3.5 space-y-3 bg-slate-50/50">
+              {doctors.map((doc) => {
+                const rec = attendanceList.find((a) => a.doctorId === doc.id);
+                const isRecorded = Boolean(rec);
+                const status = rec?.status || "NOT_MARKED";
+                const currentStaged = stagedAttendance[doc.id] || "PRESENT";
+
+                return (
+                  <div
+                    key={doc.id}
+                    className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs space-y-3"
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900">{doc.name}</h4>
+                        <p className="text-xs text-indigo-700 font-bold">{doc.specialization}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            status === "PRESENT"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : status === "ABSENT"
+                              ? "bg-rose-100 text-rose-800 border border-rose-300"
+                              : status === "LEAVE"
+                              ? "bg-amber-100 text-amber-800 border border-amber-300"
+                              : status === "HALF_DAY"
+                              ? "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {status}
+                        </span>
+                        {isRecorded && (
+                          <span className="p-1 bg-slate-100 rounded text-slate-500" title="Locked">
+                            <Lock className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Body: 2-Column Key-Value Grid */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Attendance Date
+                        </span>
+                        <span className="font-mono font-bold text-slate-800 text-[11px]">
+                          {attendanceDate}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Record State
+                        </span>
+                        <span className="font-bold text-[11px] text-slate-700">
+                          {isRecorded ? "Permanently Saved" : "Pending Submission"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Interactive Controls & Card Footer */}
+                    <div className="pt-2 border-t border-slate-100">
+                      {isRecorded ? (
+                        <div className="flex items-center gap-1.5 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 justify-center">
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Attendance record finalized</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => handleStageAttendance(doc.id, "PRESENT")}
+                              className={`py-1.5 rounded-lg text-[11px] font-bold transition-all min-h-[36px] flex items-center justify-center ${
+                                currentStaged === "PRESENT"
+                                  ? "bg-emerald-600 text-white shadow-xs"
+                                  : "text-slate-600 hover:bg-white"
+                              }`}
+                            >
+                              Present
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStageAttendance(doc.id, "HALF_DAY")}
+                              className={`py-1.5 rounded-lg text-[11px] font-bold transition-all min-h-[36px] flex items-center justify-center ${
+                                currentStaged === "HALF_DAY"
+                                  ? "bg-indigo-600 text-white shadow-xs"
+                                  : "text-slate-600 hover:bg-white"
+                              }`}
+                            >
+                              Half
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStageAttendance(doc.id, "LEAVE")}
+                              className={`py-1.5 rounded-lg text-[11px] font-bold transition-all min-h-[36px] flex items-center justify-center ${
+                                currentStaged === "LEAVE"
+                                  ? "bg-amber-600 text-white shadow-xs"
+                                  : "text-slate-600 hover:bg-white"
+                              }`}
+                            >
+                              Leave
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStageAttendance(doc.id, "ABSENT")}
+                              className={`py-1.5 rounded-lg text-[11px] font-bold transition-all min-h-[36px] flex items-center justify-center ${
+                                currentStaged === "ABSENT"
+                                  ? "bg-rose-600 text-white shadow-xs"
+                                  : "text-slate-600 hover:bg-white"
+                              }`}
+                            >
+                              Absent
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => promptConfirmSingleDoctor(doc.id, doc.name, currentStaged)}
+                            disabled={markingAttendance}
+                            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-colors shadow-xs flex items-center justify-center gap-1.5 min-h-[40px]"
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Save {doc.name}&apos;s Attendance</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* End of Attendance List: Save & Finalize Attendance Action Bar */}
+            {(() => {
+              const unrecordedDoctors = doctors.filter(
+                (d) => !attendanceList.find((a) => a.doctorId === d.id)
+              );
+              if (unrecordedDoctors.length === 0) return null;
+
+              return (
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-xs text-slate-600 font-medium">
+                    <span className="font-extrabold text-slate-900">{unrecordedDoctors.length}</span> doctor(s) pending attendance for <span className="font-mono font-bold text-slate-800">{attendanceDate}</span>. Select statuses above and click Save.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={promptConfirmBatch}
+                    disabled={markingAttendance}
+                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition-all self-end sm:self-auto"
+                  >
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Save &amp; Finalize Attendance ({unrecordedDoctors.length} Doctors)</span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Leave Records Table */}
@@ -836,10 +1124,11 @@ export function AdminDoctorManagementView() {
               <p className="text-xs text-slate-500">Live patient consultations tallied by assigned doctor</p>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop & Tablet View: Structured Horizontal Table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">
                     <th className="px-5 py-3.5">Doctor Name</th>
                     <th className="px-5 py-3.5">Specialty</th>
                     <th className="px-5 py-3.5 text-center">Daily (Today)</th>
@@ -851,8 +1140,8 @@ export function AdminDoctorManagementView() {
                 <tbody className="divide-y divide-slate-100">
                   {analyticsData?.doctors?.map((doc: any) => (
                     <tr key={doc.doctorId} className="hover:bg-slate-50/60 font-medium">
-                      <td className="px-5 py-3.5 font-bold text-slate-900">{doc.name}</td>
-                      <td className="px-5 py-3.5 text-slate-500">{doc.specialization}</td>
+                      <td className="px-5 py-3.5 font-bold text-slate-900 whitespace-nowrap">{doc.name}</td>
+                      <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{doc.specialization}</td>
                       <td className="px-5 py-3.5 text-center font-mono font-bold text-slate-900">
                         {doc.metrics.daily}
                       </td>
@@ -869,6 +1158,66 @@ export function AdminDoctorManagementView() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile View: Vertical Stacked Key-Value Cards */}
+            <div className="block md:hidden p-3.5 space-y-3 bg-slate-50/50">
+              {analyticsData?.doctors?.map((doc: any) => (
+                <div
+                  key={doc.doctorId}
+                  className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs space-y-3"
+                >
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">{doc.name}</h4>
+                      <p className="text-xs text-indigo-700 font-bold">{doc.specialization}</p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-800 border border-indigo-200">
+                      Live Tallies
+                    </span>
+                  </div>
+
+                  {/* Card Body: 2-Column Key-Value Grid */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Today Consultations
+                      </span>
+                      <span className="text-base font-black text-slate-900 font-mono mt-0.5 block">
+                        {doc.metrics.daily}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
+                        Past 7 Days
+                      </span>
+                      <span className="text-base font-black text-indigo-900 font-mono mt-0.5 block">
+                        {doc.metrics.weekly}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                        Yearly ({new Date().getFullYear()})
+                      </span>
+                      <span className="text-base font-black text-emerald-900 font-mono mt-0.5 block">
+                        {doc.metrics.yearly}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">
+                        Today Tokens
+                      </span>
+                      <span className="text-base font-black text-amber-900 font-mono mt-0.5 block">
+                        {doc.metrics.todayTokens}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -919,10 +1268,11 @@ export function AdminDoctorManagementView() {
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Desktop & Tablet View: Structured Horizontal Table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                  <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">
                     <th className="px-5 py-3.5">Doctor</th>
                     <th className="px-5 py-3.5">Working Days</th>
                     <th className="px-5 py-3.5">Base Salary</th>
@@ -936,27 +1286,27 @@ export function AdminDoctorManagementView() {
                 <tbody className="divide-y divide-slate-100">
                   {payrolls.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/60 font-medium">
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-3.5 whitespace-nowrap">
                         <span className="font-bold text-slate-900 block">{p.doctor?.name}</span>
                         <span className="text-[10px] text-slate-400">{p.doctor?.specialization}</span>
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-slate-700">
+                      <td className="px-5 py-3.5 font-mono text-slate-700 whitespace-nowrap">
                         {p.workingDays} days
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-slate-900 font-bold">
+                      <td className="px-5 py-3.5 font-mono text-slate-900 font-bold whitespace-nowrap">
                         Rs. {Number(p.basePay).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-emerald-700">
+                      <td className="px-5 py-3.5 font-mono text-emerald-700 whitespace-nowrap">
                         + Rs. {Number(p.bonuses).toLocaleString()}
                         <span className="block text-[10px] text-slate-400">({p.totalVisits} visits)</span>
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-rose-700">
+                      <td className="px-5 py-3.5 font-mono text-rose-700 whitespace-nowrap">
                         - Rs. {Number(p.deductions).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5 font-mono font-black text-sm text-slate-900">
+                      <td className="px-5 py-3.5 font-mono font-black text-sm text-slate-900 whitespace-nowrap">
                         Rs. {Number(p.netPay).toLocaleString()}
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-3.5 whitespace-nowrap">
                         <span
                           className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
                             p.status === "PAID"
@@ -967,7 +1317,7 @@ export function AdminDoctorManagementView() {
                           {p.status}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
                         <button
                           onClick={() => openAdjustPayroll(p)}
                           className="px-3 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 rounded-lg text-xs font-bold transition-colors"
@@ -979,6 +1329,93 @@ export function AdminDoctorManagementView() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile View: Vertical Stacked Key-Value Cards */}
+            <div className="block md:hidden p-3.5 space-y-3 bg-slate-50/50">
+              {payrolls.map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-2xs space-y-3"
+                >
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">{p.doctor?.name}</h4>
+                      <p className="text-xs text-indigo-700 font-bold">{p.doctor?.specialization}</p>
+                    </div>
+                    <span
+                      className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                        p.status === "PAID"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : "bg-amber-100 text-amber-800 border border-amber-300"
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </div>
+
+                  {/* Card Body: 2-Column Key-Value Grid */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Working Days
+                      </span>
+                      <span className="font-mono font-bold text-slate-800 text-[11px]">
+                        {p.workingDays} days
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Base Salary
+                      </span>
+                      <span className="font-mono font-bold text-slate-900 text-[11px]">
+                        Rs. {Number(p.basePay).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                        Patient Bonus
+                      </span>
+                      <span className="font-mono font-bold text-emerald-700 text-[11px]">
+                        + Rs. {Number(p.bonuses).toLocaleString()}
+                        <span className="text-[10px] text-slate-400 block">({p.totalVisits} visits)</span>
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 block">
+                        Adjustments / Deductions
+                      </span>
+                      <span className="font-mono font-bold text-rose-700 text-[11px]">
+                        - Rs. {Number(p.deductions).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="col-span-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-600">
+                        Net Calculated Pay
+                      </span>
+                      <span className="text-base font-black text-slate-950 font-mono">
+                        Rs. {Number(p.netPay).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Footer: Interactive Actions */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => openAdjustPayroll(p)}
+                      className="w-full py-2 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 min-h-[40px]"
+                    >
+                      <DollarSign className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Adjust Pay &amp; Bonuses</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1296,6 +1733,117 @@ export function AdminDoctorManagementView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: CONFIRM ATTENDANCE RECORDING (SHADCN / TAILWIND) */}
+      {/* ========================================================= */}
+      {showAttendanceConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200/80 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-6 h-6 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Confirm &amp; Finalize Attendance
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ruqayya Medical Center &bull; Duty Log for {attendanceDate}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <p className="text-xs font-semibold text-slate-800">
+                Are you sure you want to save and finalize this attendance record?
+              </p>
+
+              {/* Doctors Summary List */}
+              <div className="max-h-48 overflow-y-auto divide-y divide-slate-200/70 border-t border-b border-slate-200 py-1">
+                {(() => {
+                  const toConfirm = attendanceTargetDoctor
+                    ? [attendanceTargetDoctor]
+                    : doctors
+                        .filter((d) => !attendanceList.find((a) => a.doctorId === d.id))
+                        .map((d) => ({
+                          id: d.id,
+                          name: d.name,
+                          status: stagedAttendance[d.id] || "PRESENT",
+                        }));
+
+                  if (toConfirm.length === 0) {
+                    return (
+                      <div className="py-3 text-center text-xs text-slate-400">
+                        No doctors pending attendance.
+                      </div>
+                    );
+                  }
+
+                  return toConfirm.map((doc) => (
+                    <div key={doc.id} className="py-2 flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-900">{doc.name}</span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                          doc.status === "PRESENT"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : doc.status === "HALF_DAY"
+                            ? "bg-indigo-100 text-indigo-800 border-indigo-300"
+                            : doc.status === "LEAVE"
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : "bg-rose-100 text-rose-800 border-rose-300"
+                        }`}
+                      >
+                        {doc.status.replace("_", " ")}
+                      </span>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* Audit Warning */}
+              <div className="p-2.5 bg-amber-100/70 border border-amber-300/80 rounded-xl text-[11px] text-amber-950 font-medium flex items-start gap-2">
+                <Lock className="w-3.5 h-3.5 text-amber-800 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Audit Policy:</strong> Once saved, this attendance record becomes <strong>permanently locked</strong> in PostgreSQL and cannot be altered or overwritten.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttendanceConfirmModal(false);
+                  setAttendanceTargetDoctor(null);
+                }}
+                disabled={markingAttendance}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeConfirmSaveAttendance}
+                disabled={markingAttendance}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold flex items-center gap-2 shadow-sm disabled:opacity-50 transition-colors"
+              >
+                {markingAttendance ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving to Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Yes, Save &amp; Finalize</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

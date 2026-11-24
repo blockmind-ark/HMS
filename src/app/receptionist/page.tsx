@@ -564,11 +564,11 @@ export default function ReceptionistPortal() {
         </div>
 
         {/* Tab Controls */}
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-2 gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 pb-1">
             <button
               onClick={() => setActiveTab("tokens")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "tokens"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                   : "text-slate-600 hover:bg-slate-100"
@@ -582,7 +582,7 @@ export default function ReceptionistPortal() {
                 setActiveTab("checkout");
                 fetchTodayTokens();
               }}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "checkout"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                   : "text-slate-600 hover:bg-slate-100"
@@ -596,18 +596,18 @@ export default function ReceptionistPortal() {
                 setActiveTab("directory");
                 searchPatients("");
               }}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "directory"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Patient Directory & Medical History</span>
+              <span>Patient Directory &amp; History</span>
             </button>
             <button
               onClick={() => setActiveTab("accountability")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === "accountability"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                   : "text-slate-600 hover:bg-slate-100"

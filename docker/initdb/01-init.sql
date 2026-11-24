@@ -2686,6 +2686,7 @@ CREATE TABLE IF NOT EXISTS public."DoctorAttendance" (
     "doctorId" text NOT NULL,
     "dateStr" text NOT NULL,
     status text DEFAULT 'PRESENT' NOT NULL,
+    "isLocked" boolean DEFAULT true NOT NULL,
     "checkInTime" text,
     "checkOutTime" text,
     notes text,

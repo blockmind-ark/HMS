@@ -59,23 +59,37 @@ export async function POST(req: NextRequest) {
 
     const { doctorId, dateStr, status, checkInTime, checkOutTime, notes } = parseResult.data;
 
-    const record = await prisma.doctorAttendance.upsert({
+    // Check if attendance already exists for this doctor on this date
+    // Under strict hospital audit policy, once attendance is saved, it cannot be changed or overwritten.
+    const existing = await prisma.doctorAttendance.findUnique({
       where: {
         doctorId_dateStr: {
           doctorId,
           dateStr,
         },
       },
-      update: {
-        status,
-        checkInTime: checkInTime || null,
-        checkOutTime: checkOutTime || null,
-        notes: notes || null,
+      include: {
+        doctor: { select: { name: true } },
       },
-      create: {
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          error: `Attendance for Dr. ${existing.doctor.name} on ${dateStr} has already been saved as "${existing.status}" and is permanently locked. Under hospital audit policy, saved doctor attendance cannot be modified or changed.`,
+          attendance: existing,
+          isLocked: true,
+        },
+        { status: 409 }
+      );
+    }
+
+    const record = await prisma.doctorAttendance.create({
+      data: {
         doctorId,
         dateStr,
         status,
+        isLocked: true,
         checkInTime: checkInTime || null,
         checkOutTime: checkOutTime || null,
         notes: notes || null,
@@ -88,15 +102,15 @@ export async function POST(req: NextRequest) {
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
-        action: "DOCTOR_ATTENDANCE_MARKED",
-        details: `Marked attendance for ${record.doctor.name} on ${dateStr}: Status = ${status}`,
+        action: "DOCTOR_ATTENDANCE_LOCKED",
+        details: `Recorded immutable attendance for ${record.doctor.name} on ${dateStr}: Status = ${status}`,
       },
     });
 
     return NextResponse.json({
       success: true,
       attendance: record,
-      message: `Attendance marked for ${record.doctor.name} (${status}).`,
+      message: `Attendance saved and permanently locked for Dr. ${record.doctor.name} (${status}).`,
     });
   } catch (error: any) {
     console.error("Failed to mark doctor attendance:", error);
@@ -105,4 +119,25 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function PATCH() {
+  return NextResponse.json(
+    { error: "Doctor attendance records are immutable and cannot be modified once saved." },
+    { status: 403 }
+  );
+}
+
+export async function PUT() {
+  return NextResponse.json(
+    { error: "Doctor attendance records are immutable and cannot be overwritten once saved." },
+    { status: 403 }
+  );
+}
+
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "Doctor attendance records are immutable and cannot be deleted once saved." },
+    { status: 403 }
+  );
 }
