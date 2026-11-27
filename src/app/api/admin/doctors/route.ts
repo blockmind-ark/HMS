@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         perPatientShare: data.perPatientShare,
         userId: data.userId || null,
         isActive: data.isActive,
+        penaltyPolicy: data.penaltyPolicy ?? undefined,
       },
     });
 

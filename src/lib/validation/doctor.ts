@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { penaltyPolicySchema } from "@/lib/doctor-penalties";
 
 export const DoctorInputSchema = z.object({
   name: z
@@ -18,6 +19,7 @@ export const DoctorInputSchema = z.object({
   perPatientShare: z.coerce.number().min(0, "Per-patient share must be non-negative (>= 0)").default(0),
   userId: z.string().optional().or(z.literal("")),
   isActive: z.boolean().optional().default(true),
+  penaltyPolicy: penaltyPolicySchema.optional(),
 });
 
 export const DoctorUpdateSchema = z.object({
@@ -30,12 +32,13 @@ export const DoctorUpdateSchema = z.object({
   perPatientShare: z.coerce.number().min(0).optional(),
   userId: z.string().nullable().optional().or(z.literal("")),
   isActive: z.boolean().optional(),
+  penaltyPolicy: penaltyPolicySchema.optional(),
 });
 
 export const DoctorAttendanceInputSchema = z.object({
   doctorId: z.string().min(1, "Doctor ID is required"),
   dateStr: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
-  status: z.enum(["PRESENT", "ABSENT", "LEAVE", "HALF_DAY"]).default("PRESENT"),
+  status: z.enum(["PRESENT", "ABSENT", "LEAVE", "HALF_DAY", "OFF"]).default("PRESENT"),
   checkInTime: z.string().optional().or(z.literal("")),
   checkOutTime: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
@@ -58,6 +61,7 @@ export const DoctorPayrollAdjustSchema = z.object({
   workingDays: z.coerce.number().int().min(0).max(31).optional(),
   bonuses: z.coerce.number().min(0).optional(),
   deductions: z.coerce.number().min(0).optional(),
+  manualDeductions: z.coerce.number().min(0).optional(),
   status: z.enum(["DRAFT", "PAID"]).optional(),
   notes: z.string().optional().or(z.literal("")),
 });

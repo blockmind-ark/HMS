@@ -16,6 +16,8 @@ export default async function HomePage() {
     redirect("/receptionist");
   } else if (role === "PHARMACIST") {
     redirect("/pharmacist");
+  } else if (role === "DOCTOR") {
+    redirect("/doctor");
   } else {
     redirect("/login");
   }

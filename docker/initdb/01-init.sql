@@ -2668,6 +2668,7 @@ CREATE TABLE IF NOT EXISTS public."Doctor" (
     "isActive" boolean DEFAULT true NOT NULL,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "penaltyPolicy" jsonb,
     CONSTRAINT "Doctor_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."User"(id) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
@@ -2731,6 +2732,7 @@ CREATE TABLE IF NOT EXISTS public."DoctorPayroll" (
     notes text,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "penaltyBreakdown" jsonb,
     CONSTRAINT "DoctorPayroll_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES public."Doctor"(id) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT "DoctorPayroll_doctorId_year_month_key" UNIQUE ("doctorId", year, month)
 );

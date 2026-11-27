@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
 
     const { doctorId, startDate, endDate, reason, status, notes } = parseResult.data;
 
+    const doctor = await prisma.doctor.findUnique({ where: { id: doctorId }, select: { isActive: true } });
+    if (!doctor) return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+    if (!doctor.isActive) {
+      return NextResponse.json({ error: "Leave recording is disabled for inactive doctors." }, { status: 409 });
+    }
+
     const leave = await prisma.doctorLeave.create({
       data: {
         doctorId,

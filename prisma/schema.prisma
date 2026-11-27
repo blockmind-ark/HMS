@@ -525,6 +525,7 @@ model Doctor {
   baseSalary      Float              @default(0) // Base pay / salary in PKR
   payType         String             @default("MONTHLY") // "MONTHLY" | "PER_PATIENT" | "DAILY"
   perPatientShare Float              @default(0) // Optional share per consultation in PKR
+  penaltyPolicy   Json?              // Monthly doctor-specific threshold and deduction rules
   isActive        Boolean            @default(true)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -586,6 +587,7 @@ model DoctorPayroll {
   totalVisits Int      @default(0)
   bonuses     Float    @default(0)
   deductions  Float    @default(0)
+  penaltyBreakdown Json? // Snapshot of monthly automatic deductions
   netPay      Float    @default(0)
   status      String   @default("DRAFT") // "DRAFT" | "PAID"
   notes       String?

@@ -82,6 +82,7 @@ export async function PATCH(
         perPatientShare: d.perPatientShare !== undefined ? d.perPatientShare : undefined,
         userId: d.userId !== undefined ? (d.userId || null) : undefined,
         isActive: d.isActive !== undefined ? d.isActive : undefined,
+        penaltyPolicy: d.penaltyPolicy ?? undefined,
       },
     });
 

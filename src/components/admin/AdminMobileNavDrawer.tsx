@@ -226,7 +226,7 @@ export function AdminMobileNavDrawer({
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-white flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                      <span>RMC Admin Mobile App</span>
+                      <span>RMC HMS</span>
                     </span>
                     <p className="text-[10px] text-slate-400 truncate">Install on home screen</p>
                   </div>
