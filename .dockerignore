@@ -11,3 +11,13 @@ Dockerfile*
 docker-compose*.yml
 tests
 
+
+# Exclude local secrets and operational artifacts from build context
+.env.*
+!.env.example
+!.env.prod.example
+**/*.pem
+**/*.key
+**/*.dump
+**/*.backup
+docs/performance

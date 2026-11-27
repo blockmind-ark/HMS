@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     console.error("GET /api/pharmacy/returns error:", error);
     return NextResponse.json(
       { error: error?.message || "Failed to fetch medicine returns" },
-      { status: 500 }
+      { status: error?.status === 400 || error?.status === 404 ? error.status : 500 }
     );
   }
 }
@@ -103,10 +103,24 @@ export async function POST(req: NextRequest) {
 
     const { saleId, invoiceNumber, patientName, customerPhone, reason, items } = parsed.data;
 
-    // Optional sale verification if returning against an existing sale
     let originalSale: any = null;
+    // Calculate total refund
+    let totalRefundAmount = 0;
+    for (const it of items) {
+      totalRefundAmount += it.quantityReturned * it.unitPrice;
+    }
+
+    if (!Number.isFinite(totalRefundAmount)) return NextResponse.json({ error: "Invalid refund total" }, { status: 400 });
+
+    // Step A — Pharmacist Creates Return Receipt:
+    // Create MedicineReturn with status: "PENDING_CLOSING". Do NOT increment Medicine.quantity yet.
+    // Inventory restock occurs atomically when Admin accepts & approves the Daily Closing Sheet.
+    const createdReturn = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(724002)::text`;
+    // Optional sale verification if returning against an existing sale
+
     if (saleId) {
-      originalSale = await prisma.pharmacySale.findUnique({
+      originalSale = await tx.pharmacySale.findUnique({
         where: { id: saleId },
         include: {
           items: true,
@@ -119,67 +133,38 @@ export async function POST(req: NextRequest) {
       });
 
       if (!originalSale) {
-        return NextResponse.json({ error: "Original sale invoice not found" }, { status: 404 });
+        throw Object.assign(new Error("Original sale invoice not found"), { status: 404 });
       }
 
-      // Check return quantities do not exceed original sold quantities minus already returned (pending or approved)
-      for (const returnItem of items) {
-        const soldItem = originalSale.items.find((si: any) => si.medicineId === returnItem.medicineId);
-        if (!soldItem) {
-          return NextResponse.json(
-            { error: `Medicine was not part of the original sale ${originalSale.saleNumber}` },
-            { status: 400 }
-          );
-        }
-
-        // Sum previously returned quantity for this medicine from this sale across non-rejected returns
-        let previouslyReturned = 0;
-        for (const ret of originalSale.returns || []) {
-          if (ret.status === "REJECTED") continue;
-          for (const ri of ret.items || []) {
-            if (ri.medicineId === returnItem.medicineId) {
-              previouslyReturned += ri.quantityReturned;
-            }
-          }
-        }
-
-        const remainingReturnable = soldItem.quantity - previouslyReturned;
-        if (returnItem.quantityReturned > remainingReturnable) {
-          return NextResponse.json(
-            {
-              error: `Cannot return ${returnItem.quantityReturned} units. Only ${remainingReturnable} returnable units remain for this item from sale ${originalSale.saleNumber}.`,
-            },
-            { status: 400 }
-          );
-        }
+      const requested = new Map<string, number>();
+      for (const item of items) requested.set(item.medicineId, (requested.get(item.medicineId) ?? 0) + item.quantityReturned);
+      for (const [medicineId, quantity] of Array.from(requested.entries())) {
+        const sold = originalSale.items.filter((it: any) => it.medicineId === medicineId).reduce((sum: number, it: any) => sum + it.quantity, 0);
+        const returned = originalSale.returns.filter((r: any) => r.status !== "REJECTED").flatMap((r: any) => r.items).filter((it: any) => it.medicineId === medicineId).reduce((sum: number, it: any) => sum + it.quantityReturned, 0);
+        if (quantity > sold - returned) throw Object.assign(new Error("Requested quantity exceeds remaining returnable stock"), { status: 400 });
       }
     }
 
     // Generate unique sequential return number: RET-YYYY-XXXX
     const currentYear = new Date().getFullYear();
-    const totalReturns = await prisma.medicineReturn.count();
+    const totalReturns = await tx.medicineReturn.count();
     let nextNum = totalReturns + 1;
     let returnNumber = `RET-${currentYear}-${String(nextNum).padStart(4, "0")}`;
 
-    let exists = await prisma.medicineReturn.findUnique({ where: { returnNumber } });
+    let exists = await tx.medicineReturn.findUnique({ where: { returnNumber } });
     while (exists) {
       nextNum++;
       returnNumber = `RET-${currentYear}-${String(nextNum).padStart(4, "0")}`;
-      exists = await prisma.medicineReturn.findUnique({ where: { returnNumber } });
+      exists = await tx.medicineReturn.findUnique({ where: { returnNumber } });
     }
 
-    // Calculate total refund
-    let totalRefundAmount = 0;
-    for (const it of items) {
-      totalRefundAmount += it.quantityReturned * it.unitPrice;
-    }
 
-    // Step A — Pharmacist Creates Return Receipt:
-    // Create MedicineReturn with status: "PENDING_CLOSING". Do NOT increment Medicine.quantity yet.
-    // Inventory restock occurs atomically when Admin accepts & approves the Daily Closing Sheet.
-    const createdReturn = await prisma.$transaction(async (tx) => {
       // 1. Resolve batchId for audit record
       for (const item of items) {
+        if (item.batchId) {
+          const batch = await tx.stockBatch.findUnique({ where: { id: item.batchId } });
+          if (!batch || batch.medicineId !== item.medicineId) throw Object.assign(new Error("Invalid return batch"), { status: 400 });
+        }
         if (!item.batchId) {
           const defaultBatch = await tx.stockBatch.findFirst({
             where: { medicineId: item.medicineId },
@@ -253,7 +238,7 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/pharmacy/returns error:", error);
     return NextResponse.json(
       { error: error?.message || "Failed to process medicine return" },
-      { status: 500 }
+      { status: error?.status === 400 || error?.status === 404 ? error.status : 500 }
     );
   }
 }

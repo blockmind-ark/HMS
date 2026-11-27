@@ -18,20 +18,23 @@ export async function GET() {
       where: {
         createdAt: { gte: todayStart },
       },
+      select: { serviceType: true },
     }),
-    prisma.invoice.findMany({
+    prisma.invoice.aggregate({
       where: { status: "PAID" },
+      _sum: { totalAmount: true },
     }),
-    prisma.invoice.findMany({
+    prisma.invoice.aggregate({
       where: {
         status: "PAID",
         createdAt: { gte: todayStart },
       },
+      _sum: { totalAmount: true },
     }),
   ]);
 
-  const todayRevenue = todayInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-  const totalRevenue = allInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+  const todayRevenue = todayInvoices._sum.totalAmount ?? 0;
+  const totalRevenue = allInvoices._sum.totalAmount ?? 0;
 
   const opdCount = todayVisits.filter((v) =>
     v.serviceType.toLowerCase().includes("opd")

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Navbar } from "@/components/layout/Navbar";
 import {
   ShieldAlert,
@@ -47,14 +48,16 @@ import {
   X,
   Network,
   Sliders,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ReportPreviewModal, ReportType } from "@/components/reports/ReportPreviewModal";
-import { NetworkSecurityView } from "@/components/admin/NetworkSecurityView";
-import { ApprovalsManagementView } from "@/components/admin/ApprovalsManagementView";
-import { MedicinePurchaseSheetView } from "@/components/inventory/MedicinePurchaseSheetView";
-import { AdminMedicineCatalogManagementView } from "@/components/admin/AdminMedicineCatalogManagementView";
-import { AdminServicesManagementView } from "@/components/admin/AdminServicesManagementView";
-import { AdminDoctorManagementView } from "@/components/admin/AdminDoctorManagementView";
+const NetworkSecurityView = dynamic(() => import("@/components/admin/NetworkSecurityView").then(m => m.NetworkSecurityView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
+const ApprovalsManagementView = dynamic(() => import("@/components/admin/ApprovalsManagementView").then(m => m.ApprovalsManagementView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
+const MedicinePurchaseSheetView = dynamic(() => import("@/components/inventory/MedicinePurchaseSheetView").then(m => m.MedicinePurchaseSheetView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
+const AdminMedicineCatalogManagementView = dynamic(() => import("@/components/admin/AdminMedicineCatalogManagementView").then(m => m.AdminMedicineCatalogManagementView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
+const AdminServicesManagementView = dynamic(() => import("@/components/admin/AdminServicesManagementView").then(m => m.AdminServicesManagementView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
+const AdminDoctorManagementView = dynamic(() => import("@/components/admin/AdminDoctorManagementView").then(m => m.AdminDoctorManagementView), { loading: () => <div className="p-4 text-xs text-slate-500">Loading...</div> });
 import { AdminMobileNavDrawer } from "@/components/admin/AdminMobileNavDrawer";
 
 export default function AdminPortal() {
@@ -67,6 +70,7 @@ export default function AdminPortal() {
   // Stats state
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [lowStockExpanded, setLowStockExpanded] = useState(false);
 
   // Daily Report state
   const [dailyDate, setDailyDate] = useState(
@@ -371,19 +375,23 @@ export default function AdminPortal() {
   useEffect(() => {
     fetchStats();
     fetchApprovals();
-    fetchDailyReport(dailyDate);
-    fetchReportsOverview();
   }, []);
 
   useEffect(() => {
-    if (activeTab === "users") {
-      fetchUsers();
-    }
+    if (activeTab === "users") fetchUsers();
+  }, [activeTab, userSearch, userRoleFilter]);
+  useEffect(() => {
     if (activeTab === "daily") fetchDailyReport(dailyDate);
+  }, [activeTab, dailyDate]);
+  useEffect(() => {
     if (activeTab === "approvals") fetchApprovals();
+  }, [activeTab]);
+  useEffect(() => {
     if (activeTab === "audit") fetchAuditLogs();
+  }, [activeTab, auditSearch, auditActionFilter]);
+  useEffect(() => {
     if (activeTab === "reports") fetchReportsOverview();
-  }, [activeTab, dailyDate, auditSearch, auditActionFilter, userSearch, userRoleFilter]);
+  }, [activeTab]);
 
   // Handle Approve / Reject
   const handleProcessApproval = async () => {
@@ -601,88 +609,67 @@ export default function AdminPortal() {
 
         {/* TAB 1: EXECUTIVE DASHBOARD & P&L */}
         {activeTab === "dashboard" && stats && (
-          <div className="space-y-6">
-            {/* Prominent Executive Real-Time Low-Stock Alarm Banner */}
+          <div className="min-w-0 space-y-4 sm:space-y-6">
+            {/* Compact, expandable executive low-stock alert. */}
             {stats.lowStockCount > 0 && (
-              <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-rose-500/10 border-2 border-red-500/40 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 animate-in fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold shadow-md shadow-red-500/30 animate-pulse flex-shrink-0">
-                      <AlertTriangle className="w-5 h-5" />
+              <section className="min-w-0 rounded-2xl border border-red-200 bg-red-50/80 shadow-sm" aria-label="Executive low-stock alert">
+                <button
+                  type="button"
+                  aria-expanded={lowStockExpanded}
+                  aria-controls="admin-low-stock-details"
+                  onClick={() => setLowStockExpanded((expanded) => !expanded)}
+                  className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 sm:px-4"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white">
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-extrabold text-red-950 sm:text-sm">Executive Low-Stock Alert</span>
+                    <span className="block text-xs text-red-800">{stats.lowStockCount} {stats.lowStockCount === 1 ? "medicine needs" : "medicines need"} stock attention</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-red-800">
+                    {lowStockExpanded ? "Minimize" : "View details"}
+                    {lowStockExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </span>
+                </button>
+                {lowStockExpanded && (
+                  <div id="admin-low-stock-details" className="space-y-3 border-t border-red-200 px-3 pb-4 pt-3 sm:px-4">
+                    <p className="text-xs text-slate-700">Live stock is at or below its safety threshold. Review purchases or pending approvals.</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(stats.lowStockItems || []).slice(0, 10).map((item: any) => (
+                        <div key={item.id} className="min-w-0 rounded-xl border border-red-200 bg-white p-3">
+                          <p className="break-words text-xs font-extrabold text-slate-900">{item.name}</p>
+                          <p className="mt-1 break-words text-[11px] text-slate-500">{item.category}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold">
+                            <span className="rounded-md bg-red-100 px-2 py-1 text-red-800">Stock: {item.totalStock}</span>
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-700">Limit: {item.threshold}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-red-600 text-white uppercase tracking-wider">
-                          🔴 Executive Low-Stock Alarm
-                        </span>
-                        <span className="text-xs sm:text-sm font-extrabold text-red-950">
-                          {stats.lowStockCount} {stats.lowStockCount === 1 ? "Medicine" : "Medicines"} Running Below Threshold
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        Live dispensary stock is at or below defined safety alarm limits (<code>quantity &le; threshold</code>). Reorders or batch approvals required immediately.
-                      </p>
+                    {(stats.lowStockItems || []).length > 10 && (
+                      <p className="text-xs font-semibold text-red-800">+{stats.lowStockItems.length - 10} more low-stock items</p>
+                    )}
+                    <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                      <button type="button" onClick={() => setActiveTab("approvals")} className="min-h-11 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white">Approvals Center ({stats.metrics?.pendingApprovalsCount || 0})</button>
+                      <button type="button" onClick={() => setActiveTab("inventory")} className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white">Hospital Purchase Sheet</button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("approvals")}
-                      className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm flex-shrink-0"
-                    >
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Approvals Center ({stats.metrics?.pendingApprovalsCount || 0})</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("inventory")}
-                      className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm shadow-red-600/20 flex-shrink-0"
-                    >
-                      <Package className="w-3.5 h-3.5" />
-                      <span>Hospital Purchase Sheet</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Low-Stock Item Badges */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {(stats.lowStockItems || []).slice(0, 10).map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 rounded-xl text-xs shadow-sm hover:border-red-400 transition-colors"
-                    >
-                      <span className="font-extrabold text-slate-900">{item.name}</span>
-                      <span className="text-[10px] text-slate-400">({item.category})</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800">
-                        Live Stock: {item.totalStock}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-medium">
-                        Limit: {item.threshold}
-                      </span>
-                    </div>
-                  ))}
-                  {stats.lowStockItems && stats.lowStockItems.length > 10 && (
-                    <span className="text-xs font-bold text-red-700 self-center pl-1">
-                      +{stats.lowStockItems.length - 10} more low-stock items
-                    </span>
-                  )}
-                </div>
-              </div>
+                )}
+              </section>
             )}
 
             {/* KPI Cards Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+              <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
                   <Banknote className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Total Gross Revenue
                   </p>
-                  <h3 className="text-2xl font-black text-slate-900">
+                  <h3 className="text-lg sm:text-2xl break-words [overflow-wrap:anywhere] font-black text-slate-900">
                     Rs. {stats.metrics.totalCombinedRevenue.toFixed(2)}
                   </h3>
                   <p className="text-[11px] text-purple-600 font-medium">
@@ -691,15 +678,15 @@ export default function AdminPortal() {
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Pharmacy Net Profit
                   </p>
-                  <h3 className="text-2xl font-black text-emerald-700">
+                  <h3 className="text-lg sm:text-2xl break-words [overflow-wrap:anywhere] font-black text-emerald-700">
                     Rs. {stats.metrics.pharmacyNetProfit.toFixed(2)}
                   </h3>
                   <p className="text-[11px] text-emerald-600 font-semibold">
@@ -708,15 +695,15 @@ export default function AdminPortal() {
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Users className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Patient Encounters
                   </p>
-                  <h3 className="text-2xl font-black text-slate-900">
+                  <h3 className="text-lg sm:text-2xl break-words [overflow-wrap:anywhere] font-black text-slate-900">
                     {stats.metrics.totalVisits}
                   </h3>
                   <p className="text-[11px] text-slate-400">
@@ -725,15 +712,15 @@ export default function AdminPortal() {
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                   <Package className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Inventory Asset Value
                   </p>
-                  <h3 className="text-2xl font-black text-slate-900">
+                  <h3 className="text-lg sm:text-2xl break-words [overflow-wrap:anywhere] font-black text-slate-900">
                     Rs. {stats.metrics.inventoryValuation.toFixed(2)}
                   </h3>
                   <p className="text-[11px] text-amber-600 font-medium">
@@ -746,8 +733,8 @@ export default function AdminPortal() {
             {/* Financial Breakdown & Top Medicines */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Revenue Stream Breakdown (6 Cols) */}
-              <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="min-w-0 lg:col-span-6 bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-2 pb-3 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-purple-600" />
                     <span>Revenue Streams & Profit / Loss Statement</span>
@@ -760,7 +747,7 @@ export default function AdminPortal() {
                 <div className="space-y-4">
                   {/* Clinical Stream */}
                   <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
                         <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
                         Clinical Hospital Invoices (OPD & USG)
@@ -787,7 +774,7 @@ export default function AdminPortal() {
 
                   {/* Pharmacy Stream */}
                   <div className="p-4 bg-amber-50/70 border border-amber-100 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
                         <Pill className="w-3.5 h-3.5 text-amber-600" />
                         Pharmacy POS Gross Sales
@@ -814,15 +801,15 @@ export default function AdminPortal() {
 
                   {/* Profit Calculation Box */}
                   <div className="p-4 bg-slate-900 text-white rounded-xl space-y-2 text-xs">
-                    <div className="flex justify-between text-slate-400">
+                    <div className="flex flex-wrap justify-between gap-2 text-slate-400">
                       <span>Pharmacy Gross Sales:</span>
                       <span>Rs. {stats.metrics.totalPharmacyRevenue.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-slate-400">
+                    <div className="flex flex-wrap justify-between gap-2 text-slate-400">
                       <span>Cost of Goods Sold (COGS):</span>
                       <span>-Rs. {stats.metrics.pharmacyCOGS.toFixed(2)}</span>
                     </div>
-                    <div className="pt-2 border-t border-slate-800 flex justify-between font-black text-sm">
+                    <div className="pt-2 border-t border-slate-800 flex flex-wrap justify-between gap-2 font-black text-sm">
                       <span className="text-slate-300">Net Pharmacy Profit:</span>
                       <span className="text-emerald-400">
                         Rs. {stats.metrics.pharmacyNetProfit.toFixed(2)}
@@ -833,8 +820,8 @@ export default function AdminPortal() {
               </div>
 
               {/* Top Selling Medicines (6 Cols) */}
-              <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="min-w-0 lg:col-span-6 bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-2 pb-3 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                     <span>Top Dispensed Medicines & Turnover</span>
@@ -846,26 +833,16 @@ export default function AdminPortal() {
 
                 <div className="space-y-3">
                   {stats.topSellingMedicines.map((med: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 font-extrabold text-xs flex items-center justify-center">
-                          #{idx + 1}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">
-                            {med.name}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            {med.quantity} units dispensed
-                          </div>
-                        </div>
+                    <div key={idx} className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 rounded-xl border border-slate-100 bg-slate-50 p-3 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-xs font-extrabold text-purple-700">#{idx + 1}</div>
+                      <div className="min-w-0">
+                        <p className="break-words text-xs font-bold leading-5 text-slate-900">{med.name}</p>
+                        <p className="text-[11px] text-slate-500">{med.quantity} units dispensed</p>
                       </div>
-                      <span className="text-xs font-mono font-extrabold text-slate-900">
-                        Rs. {med.revenue.toFixed(2)}
-                      </span>
+                      <div className="col-start-2 min-w-0 text-left sm:col-start-3 sm:row-start-1 sm:text-right">
+                        <span className="block text-[10px] font-medium uppercase tracking-wide text-slate-500">Turnover</span>
+                        <span className="block break-words text-xs font-extrabold tabular-nums text-slate-900">Rs. {med.revenue.toFixed(2)}</span>
+                      </div>
                     </div>
                   ))}
                   {stats.topSellingMedicines.length === 0 && (
@@ -883,7 +860,7 @@ export default function AdminPortal() {
         {activeTab === "users" && (
           <div className="space-y-6">
             {/* Header Control Panel */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <div className="bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -895,12 +872,12 @@ export default function AdminPortal() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                   {/* Add User Button */}
                   <button
                     type="button"
                     onClick={() => setShowAddUserModal(true)}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
+                    className="min-h-11 w-full justify-center sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>Add New User</span>
@@ -917,7 +894,7 @@ export default function AdminPortal() {
                     placeholder="Search users by name or email..."
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800"
+                    className="w-full min-h-11 pl-9 pr-4 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800"
                   />
                 </div>
 
@@ -925,7 +902,7 @@ export default function AdminPortal() {
                   <select
                     value={userRoleFilter}
                     onChange={(e) => setUserRoleFilter(e.target.value)}
-                    className="w-full py-2 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800"
+                    className="w-full min-h-11 py-2 px-3 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800"
                   >
                     <option value="ALL">All Roles</option>
                     <option value="ADMIN">ADMIN</option>
@@ -961,7 +938,23 @@ export default function AdminPortal() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              {/* Mobile card directory: no horizontal scrolling. */}
+              <div className="grid grid-cols-1 gap-3 p-3 sm:p-4 md:hidden">
+                {users.map((u) => (
+                  <article key={u.id} className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-xs font-black text-purple-700">{u.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}</span>
+                      <div className="min-w-0 flex-1"><p className="break-words text-sm font-extrabold text-slate-900">{u.name}</p><p className="break-all text-xs text-slate-500">{u.email}</p></div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="rounded-lg bg-purple-100 px-2.5 py-1 font-bold text-purple-800">{u.role}</span><span className="text-slate-500">Created {new Date(u.createdAt).toLocaleDateString()}</span></div>
+                    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs"><span className="shrink-0 font-semibold text-slate-500">Password</span><span className="min-w-0 flex-1 break-all font-mono">{revealedPasswords[u.id] ? (u.displayPassword || "(Bcrypt Hash)") : "••••••••"}</span><button type="button" aria-label={revealedPasswords[u.id] ? "Hide password" : "View password"} onClick={() => togglePasswordVisibility(u.id)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">{revealedPasswords[u.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>{u.displayPassword && <button type="button" aria-label="Copy password" onClick={() => handleCopyPassword(u.id, u.displayPassword)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">{copiedUserId === u.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}</button>}</div>
+                    <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setUserForPasswordChange(u); setNewPasswordInput(""); setShowNewPassword(false); }} className="min-h-11 rounded-lg border border-amber-200 bg-amber-50 px-2 text-xs font-bold text-amber-800">Change Password</button><button type="button" onClick={() => setSelectedUserForDetails(u)} className="min-h-11 rounded-lg bg-slate-200 px-2 text-xs font-bold text-slate-800">View Profile</button>{u.role === "ADMIN" ? <span className="col-span-2 rounded-lg bg-slate-100 py-2 text-center text-xs font-semibold text-slate-500">Administrator account protected</span> : <button type="button" onClick={() => setUserForDeletion(u)} className="col-span-2 min-h-11 rounded-lg border border-rose-200 bg-rose-50 px-2 text-xs font-bold text-rose-700">Delete User</button>}</div>
+                  </article>
+                ))}
+                {users.length === 0 && <p className="py-6 text-center text-xs text-slate-500">{loadingUsers ? "Loading user accounts..." : "No users match current filters."}</p>}
+              </div>
+
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-200/70 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
@@ -1120,9 +1113,9 @@ export default function AdminPortal() {
 
         {/* TAB: DAILY SALES RECONCILIATION REPORT (AGAINST CLINICAL & PHARMACY PORTALS) */}
         {activeTab === "daily" && (
-          <div className="printable-daily-report space-y-6">
+          <div className="printable-daily-report min-w-0 space-y-4 sm:space-y-6">
             {/* Header Control Panel (Hidden on print) */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 print:hidden">
+            <div className="bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 print:hidden">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -1135,7 +1128,7 @@ export default function AdminPortal() {
                 </div>
 
                 {/* Print and Export Buttons */}
-                <div className="flex items-center gap-2.5">
+                <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -1143,7 +1136,7 @@ export default function AdminPortal() {
                       setPreviewReportType("daily");
                       setPreviewModalOpen(true);
                     }}
-                    className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    className="min-h-11 justify-center px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     <span>Preview Summary</span>
@@ -1151,7 +1144,7 @@ export default function AdminPortal() {
                   <button
                     type="button"
                     onClick={() => window.print()}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    className="min-h-11 justify-center px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>Print Daily Audit</span>
@@ -1159,7 +1152,7 @@ export default function AdminPortal() {
                   <a
                     href={`/api/admin/export?type=daily&date=${dailyDate}`}
                     download
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    className="min-h-11 justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Export Daily CSV</span>
@@ -1169,7 +1162,7 @@ export default function AdminPortal() {
 
               {/* Date Selection Controls */}
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                     Audit Date:
                   </label>
@@ -1185,7 +1178,7 @@ export default function AdminPortal() {
                 </div>
 
                 {/* Quick Presets */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-semibold text-slate-400 mr-1">
                     Quick Dates:
                   </span>
@@ -1235,7 +1228,7 @@ export default function AdminPortal() {
 
             {/* Official Print Header (Only visible on print) */}
             <div className="hidden print:block text-center pb-5 mb-5 border-b-2 border-slate-900 space-y-1.5">
-              <h1 className="text-2xl font-black uppercase tracking-wider">
+              <h1 className="break-words [overflow-wrap:anywhere] text-lg sm:text-2xl font-black uppercase tracking-wider">
                 Ruqayya MEDICAL CENTER &amp; PHARMACY MANAGEMENT SYSTEM
               </h1>
               <p className="text-sm text-slate-700 font-bold uppercase tracking-wide">
@@ -1254,9 +1247,9 @@ export default function AdminPortal() {
             ) : dailyReport ? (
               <>
                 {/* 4 Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
                   {/* Card 1: Combined Net Collections */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+                  <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
                       <Banknote className="w-6 h-6" />
                     </div>
@@ -1264,7 +1257,7 @@ export default function AdminPortal() {
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Net Combined Sales
                       </p>
-                      <h3 className="text-2xl font-black text-slate-900">
+                      <h3 className="break-words [overflow-wrap:anywhere] text-lg sm:text-2xl font-black text-slate-900">
                         Rs. {dailyReport.summary.combinedNet.toFixed(2)}
                       </h3>
                       <p className="text-[11px] text-purple-600 font-medium">
@@ -1274,7 +1267,7 @@ export default function AdminPortal() {
                   </div>
 
                   {/* Card 2: Clinical Reception Stream */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+                  <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                       <Stethoscope className="w-6 h-6" />
                     </div>
@@ -1282,7 +1275,7 @@ export default function AdminPortal() {
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Clinical Portal Sales
                       </p>
-                      <h3 className="text-2xl font-black text-blue-700">
+                      <h3 className="break-words [overflow-wrap:anywhere] text-lg sm:text-2xl font-black text-blue-700">
                         Rs. {dailyReport.summary.clinicalNet.toFixed(2)}
                       </h3>
                       <p className="text-[11px] text-slate-500 font-medium">
@@ -1292,7 +1285,7 @@ export default function AdminPortal() {
                   </div>
 
                   {/* Card 3: Pharmaceutical Dispensary Stream */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+                  <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
                       <Pill className="w-6 h-6" />
                     </div>
@@ -1300,7 +1293,7 @@ export default function AdminPortal() {
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Pharmacy Portal Sales
                       </p>
-                      <h3 className="text-2xl font-black text-amber-700">
+                      <h3 className="break-words [overflow-wrap:anywhere] text-lg sm:text-2xl font-black text-amber-700">
                         Rs. {dailyReport.summary.pharmacyNet.toFixed(2)}
                       </h3>
                       <p className="text-[11px] text-slate-500 font-medium">
@@ -1310,7 +1303,7 @@ export default function AdminPortal() {
                   </div>
 
                   {/* Card 4: Daily Net Operational Profit */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+                  <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                     <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                       <TrendingUp className="w-6 h-6" />
                     </div>
@@ -1318,7 +1311,7 @@ export default function AdminPortal() {
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                         Net Daily Operating Profit
                       </p>
-                      <h3 className="text-2xl font-black text-emerald-700">
+                      <h3 className="break-words [overflow-wrap:anywhere] text-lg sm:text-2xl font-black text-emerald-700">
                         Rs. {dailyReport.summary.combinedNetProfit.toFixed(2)}
                       </h3>
                       <p className="text-[11px] text-emerald-600 font-semibold">
@@ -1419,10 +1412,10 @@ export default function AdminPortal() {
                 </div>
 
                 {/* Stream Switcher Filter (Hidden on print) */}
-                <div className="flex items-center gap-2 print:hidden">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center print:hidden">
                   <button
                     onClick={() => setDailyStreamFilter("ALL")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`min-h-11 px-2 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                       dailyStreamFilter === "ALL"
                         ? "bg-slate-900 text-white shadow-sm"
                         : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -1432,7 +1425,7 @@ export default function AdminPortal() {
                   </button>
                   <button
                     onClick={() => setDailyStreamFilter("CLINICAL")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`min-h-11 px-2 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                       dailyStreamFilter === "CLINICAL"
                         ? "bg-blue-600 text-white shadow-sm"
                         : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -1442,7 +1435,7 @@ export default function AdminPortal() {
                   </button>
                   <button
                     onClick={() => setDailyStreamFilter("PHARMACY")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`min-h-11 px-2 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                       dailyStreamFilter === "PHARMACY"
                         ? "bg-amber-600 text-white shadow-sm"
                         : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -1453,7 +1446,7 @@ export default function AdminPortal() {
                   {dailyReport.medicineReturns && dailyReport.medicineReturns.length > 0 && (
                     <button
                       onClick={() => setDailyStreamFilter("RETURNS")}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      className={`min-h-11 px-2 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                         dailyStreamFilter === "RETURNS"
                           ? "bg-rose-600 text-white shadow-sm"
                           : "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50"
@@ -1467,7 +1460,7 @@ export default function AdminPortal() {
                 {/* Section 1: Clinical Hospital Invoices Table */}
                 {(dailyStreamFilter === "ALL" || dailyStreamFilter === "CLINICAL") && (
                   <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                    <div className="p-4 bg-blue-50/70 border-b border-blue-200 flex items-center justify-between">
+                    <div className="p-4 bg-blue-50/70 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Stethoscope className="w-4 h-4 text-blue-700" />
                         <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wider">
@@ -1479,7 +1472,8 @@ export default function AdminPortal() {
                       </span>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="grid gap-3 p-3 md:hidden print:hidden">{dailyReport.clinicalInvoices.map((inv: any) => (<article key={inv.id} className="min-w-0 rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-xs font-bold text-blue-800">{inv.invoiceNumber}</p><p className="break-words text-sm font-extrabold text-slate-900">{inv.patientName}</p><p className="break-all text-[11px] text-slate-500">{inv.patientUid}</p></div><span className="text-xs font-black text-blue-900">Rs. {inv.totalAmount.toFixed(2)}</span></div><div className="grid grid-cols-2 gap-2 text-xs"><div><span className="text-slate-500">Service</span><p className="break-words font-semibold">{inv.serviceType}</p></div><div><span className="text-slate-500">Receptionist</span><p className="break-words font-semibold">{inv.operatorName}</p></div><div><span className="text-slate-500">Time</span><p>{new Date(inv.createdAt).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</p></div><div><span className="text-slate-500">Subtotal / Discount</span><p>Rs. {inv.subtotal.toFixed(2)} / Rs. {inv.discount.toFixed(2)}</p></div></div></article>))}{dailyReport.clinicalInvoices.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No clinical invoices for this date.</p>}</div>
+                    <div className="hidden md:block overflow-x-auto print:block">
                       <table className="w-full text-left text-xs text-slate-700">
                         <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                           <tr>
@@ -1567,7 +1561,7 @@ export default function AdminPortal() {
                 {/* Section 2: Pharmaceutical POS Dispensary Sales Table */}
                 {(dailyStreamFilter === "ALL" || dailyStreamFilter === "PHARMACY") && (
                   <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                    <div className="p-4 bg-amber-50/70 border-b border-amber-200 flex items-center justify-between">
+                    <div className="p-4 bg-amber-50/70 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Pill className="w-4 h-4 text-amber-700" />
                         <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
@@ -1579,7 +1573,8 @@ export default function AdminPortal() {
                       </span>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="grid gap-3 p-3 md:hidden print:hidden">{dailyReport.pharmacySales.map((sale: any) => (<article key={sale.id} className="min-w-0 space-y-2 rounded-xl border border-amber-100 bg-amber-50/40 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-xs font-bold text-amber-800">{sale.saleNumber}</p><p className="break-words text-sm font-extrabold text-slate-900">{sale.customerName}</p><p className="break-all text-[11px] text-slate-500">{sale.patientUid}</p></div><span className="text-xs font-black text-amber-900">Rs. {sale.totalAmount.toFixed(2)}</span></div><p className="break-words text-xs text-slate-700">{sale.itemsSummary}</p><div className="grid grid-cols-2 gap-2 text-xs"><div><span className="text-slate-500">Pharmacist</span><p className="break-words font-semibold">{sale.pharmacistName}</p></div><div><span className="text-slate-500">Time</span><p>{new Date(sale.createdAt).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</p></div><div><span className="text-slate-500">Subtotal / Discount</span><p>Rs. {sale.subtotal.toFixed(2)} / Rs. {sale.discount.toFixed(2)}</p></div><div><span className="text-slate-500">COGS / Profit</span><p>Rs. {sale.cogs.toFixed(2)} / Rs. {sale.profit.toFixed(2)}</p></div></div></article>))}{dailyReport.pharmacySales.length === 0 && <p className="py-5 text-center text-xs text-slate-500">No pharmacy sales for this date.</p>}</div>
+                    <div className="hidden md:block overflow-x-auto print:block">
                       <table className="w-full text-left text-xs text-slate-700">
                         <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                           <tr>
@@ -1683,7 +1678,7 @@ export default function AdminPortal() {
                   dailyReport.medicineReturns &&
                   dailyReport.medicineReturns.length > 0 && (
                     <div className="bg-white rounded-2xl border border-rose-200 shadow-sm overflow-hidden">
-                      <div className="p-4 bg-rose-50/70 border-b border-rose-200 flex items-center justify-between">
+                      <div className="p-4 bg-rose-50/70 border-b border-rose-200 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-rose-700" />
                           <h4 className="text-xs font-bold text-rose-950 uppercase tracking-wider">
@@ -1695,7 +1690,8 @@ export default function AdminPortal() {
                         </span>
                       </div>
 
-                      <div className="overflow-x-auto">
+                      <div className="grid gap-3 p-3 md:hidden print:hidden">{dailyReport.medicineReturns.map((ret: any) => (<article key={ret.id} className="min-w-0 space-y-2 rounded-xl border border-rose-100 bg-rose-50/40 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="break-words text-xs font-bold text-rose-800">{ret.returnNumber}</p><p className="break-words text-sm font-extrabold">{ret.customerName}</p></div><span className="font-black text-xs text-rose-800">-Rs. {ret.totalRefundAmount.toFixed(2)}</span></div><p className="break-words text-xs">{ret.itemsSummary}</p><div className="grid grid-cols-2 gap-2 text-xs"><div><span className="text-slate-500">Original Sale</span><p className="break-words">{ret.saleNumber || "Direct Return"}</p></div><div><span className="text-slate-500">Status</span><p>{ret.status === "APPROVED" ? "Restocked" : "Pending Restock"}</p></div><div><span className="text-slate-500">Processed By</span><p className="break-words">{ret.processedByName}</p></div><div><span className="text-slate-500">Time</span><p>{new Date(ret.createdAt).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</p></div></div><p className="break-words text-xs text-slate-500">Reason: {ret.reason || "N/A"}</p></article>))}</div>
+                      <div className="hidden md:block overflow-x-auto print:block">
                         <table className="w-full text-left text-xs text-slate-700">
                           <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                             <tr>
@@ -1802,7 +1798,7 @@ export default function AdminPortal() {
         {activeTab === "reports" && (
           <div className="space-y-6">
             {/* Header with Live Summary Ribbon */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
+            <div className="bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -1817,7 +1813,7 @@ export default function AdminPortal() {
                 <button
                   onClick={fetchReportsOverview}
                   disabled={loadingReportsOverview}
-                  className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                  className="min-h-11 px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingReportsOverview ? "animate-spin text-purple-600" : ""}`} />
                   <span>Refresh Overview</span>
@@ -1876,12 +1872,12 @@ export default function AdminPortal() {
               </div>
 
               {/* 6 Report Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-2">
                 {/* 1. Clinical Visits Report */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-blue-300 transition-colors">
+                <div className="min-w-0 p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-blue-300 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="min-w-0 text-xs font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
                         <Stethoscope className="w-4 h-4 text-blue-600" />
                         <span>Patient Clinical Encounters</span>
                       </h4>
@@ -1931,7 +1927,7 @@ export default function AdminPortal() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1939,7 +1935,7 @@ export default function AdminPortal() {
                         setPreviewReportType("visits");
                         setPreviewModalOpen(true);
                       }}
-                      className="flex-1 py-2 bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>{patientEncounterSearch ? "Search & Preview" : "Preview Summary"}</span>
@@ -1951,7 +1947,7 @@ export default function AdminPortal() {
                           : "/api/admin/export?type=visits"
                       }
                       download
-                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download CSV</span>
@@ -1960,10 +1956,10 @@ export default function AdminPortal() {
                 </div>
 
                 {/* 2. Hospital Invoices Report */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-emerald-300 transition-colors">
+                <div className="min-w-0 p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-emerald-300 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="min-w-0 text-xs font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
                         <Receipt className="w-4 h-4 text-emerald-600" />
                         <span>Clinical Hospital Invoices</span>
                       </h4>
@@ -1980,7 +1976,7 @@ export default function AdminPortal() {
                       <span>Rs. {(reportsOverview?.invoices.netCollected ?? 0).toFixed(2)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1988,7 +1984,7 @@ export default function AdminPortal() {
                         setPreviewReportType("invoices");
                         setPreviewModalOpen(true);
                       }}
-                      className="flex-1 py-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Preview Summary</span>
@@ -1996,7 +1992,7 @@ export default function AdminPortal() {
                     <a
                       href="/api/admin/export?type=invoices"
                       download
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download CSV</span>
@@ -2005,10 +2001,10 @@ export default function AdminPortal() {
                 </div>
 
                 {/* 3. Pharmacy Sales Report */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-amber-300 transition-colors">
+                <div className="min-w-0 p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-amber-300 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="min-w-0 text-xs font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
                         <Pill className="w-4 h-4 text-amber-600" />
                         <span>Pharmacy POS Sales Ledger</span>
                       </h4>
@@ -2025,7 +2021,7 @@ export default function AdminPortal() {
                       <span>Rs. {(reportsOverview?.sales.netRevenue ?? 0).toFixed(2)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -2033,7 +2029,7 @@ export default function AdminPortal() {
                         setPreviewReportType("sales");
                         setPreviewModalOpen(true);
                       }}
-                      className="flex-1 py-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Preview Summary</span>
@@ -2041,7 +2037,7 @@ export default function AdminPortal() {
                     <a
                       href="/api/admin/export?type=sales"
                       download
-                      className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download CSV</span>
@@ -2050,10 +2046,10 @@ export default function AdminPortal() {
                 </div>
 
                 {/* 4. Inventory Batches Report */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-slate-400 transition-colors">
+                <div className="min-w-0 p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-slate-400 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="min-w-0 text-xs font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
                         <Package className="w-4 h-4 text-slate-800" />
                         <span>Medicine Batches & Valuations</span>
                       </h4>
@@ -2070,7 +2066,7 @@ export default function AdminPortal() {
                       <span>Rs. {(reportsOverview?.inventory.valuation ?? 0).toLocaleString()}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -2078,7 +2074,7 @@ export default function AdminPortal() {
                         setPreviewReportType("inventory");
                         setPreviewModalOpen(true);
                       }}
-                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Preview Summary</span>
@@ -2086,7 +2082,7 @@ export default function AdminPortal() {
                     <a
                       href="/api/admin/export?type=inventory"
                       download
-                      className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download CSV</span>
@@ -2095,10 +2091,10 @@ export default function AdminPortal() {
                 </div>
 
                 {/* 5. Audit Trail Report */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-purple-300 transition-colors">
+                <div className="min-w-0 p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3 hover:border-purple-300 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h4 className="min-w-0 text-xs font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
                         <History className="w-4 h-4 text-purple-600" />
                         <span>Full Immutable Audit Trail</span>
                       </h4>
@@ -2115,7 +2111,7 @@ export default function AdminPortal() {
                       <span>RFC 4180 Format</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -2123,7 +2119,7 @@ export default function AdminPortal() {
                         setPreviewReportType("audit");
                         setPreviewModalOpen(true);
                       }}
-                      className="flex-1 py-2 bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Preview Summary</span>
@@ -2131,7 +2127,7 @@ export default function AdminPortal() {
                     <a
                       href="/api/admin/export?type=audit"
                       download
-                      className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                      className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download CSV</span>
@@ -2142,7 +2138,7 @@ export default function AdminPortal() {
                 {/* 6. Daily Cross-Portal Sales Reconciliation Report */}
                 <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl flex flex-col justify-between space-y-3 sm:col-span-2 lg:col-span-1 hover:border-rose-300 transition-colors">
                   <div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
                       <h4 className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
                         <Calendar className="w-4 h-4 text-rose-600" />
                         <span>Daily Sales Reconciliation</span>
@@ -2173,7 +2169,7 @@ export default function AdminPortal() {
                           setPreviewReportType("daily");
                           setPreviewModalOpen(true);
                         }}
-                        className="flex-1 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Preview Summary</span>
@@ -2181,7 +2177,7 @@ export default function AdminPortal() {
                       <a
                         href={`/api/admin/export?type=daily&date=${dailyDate}`}
                         download
-                        className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors shadow-sm"
+                        className="min-w-0 min-h-11 px-2 sm:px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-colors shadow-sm"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>Export CSV</span>
@@ -2198,7 +2194,7 @@ export default function AdminPortal() {
         {activeTab === "audit" && (
           <div className="space-y-4">
             {/* Filter Bar */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:w-80">
                 <Search className="w-4 h-4 absolute inset-y-0 left-3 my-auto text-slate-400" />
                 <input
@@ -2206,15 +2202,15 @@ export default function AdminPortal() {
                   placeholder="Search user, action, details..."
                   value={auditSearch}
                   onChange={(e) => setAuditSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-900"
+                  className="min-h-11 w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 w-full sm:flex sm:w-auto">
                 <select
                   value={auditActionFilter}
                   onChange={(e) => setAuditActionFilter(e.target.value)}
-                  className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="min-w-0 min-h-11 w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="ALL">All System Actions</option>
                   <option value="PATIENT_ENROLLED">Patient Enrolled</option>
@@ -2228,7 +2224,7 @@ export default function AdminPortal() {
                 <a
                   href="/api/admin/export?type=audit"
                   download
-                  className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+                  className="min-h-11 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Export</span>
@@ -2238,7 +2234,21 @@ export default function AdminPortal() {
 
             {/* Audit Logs Table */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Readable mobile audit records, retaining the desktop table. */}
+              <div className="grid gap-3 p-3 md:hidden">
+                {auditLogs.map((log) => (
+                  <article key={log.id} className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1"><p className="break-words text-sm font-extrabold text-slate-900">{log.user?.name || "System"}</p><p className="text-[11px] text-slate-500">{new Date(log.createdAt).toLocaleString()}</p></div>
+                      <span className={`rounded-lg px-2 py-1 text-[10px] font-bold uppercase ${log.user?.role === "ADMIN" ? "bg-purple-100 text-purple-700" : log.user?.role === "RECEPTIONIST" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{log.user?.role || "SYSTEM"}</span>
+                    </div>
+                    <div><p className="mb-1 text-[10px] font-bold uppercase text-slate-500">Action</p><p className="break-all rounded-lg bg-white px-3 py-2 font-mono text-xs font-semibold text-slate-800">{log.action}</p></div>
+                    <div><p className="mb-1 text-[10px] font-bold uppercase text-slate-500">Activity Details</p><p className="break-words [overflow-wrap:anywhere] text-xs leading-5 text-slate-700">{log.details || "No additional details"}</p></div>
+                  </article>
+                ))}
+                {auditLogs.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No audit logs match current filters.</p>}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
                     <tr>
@@ -2309,11 +2319,11 @@ export default function AdminPortal() {
         {activeTab === "inventory" && (
           <div className="space-y-4">
             {/* Inventory Sub-Tabs Switcher */}
-            <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-sm w-fit">
+            <div className="grid w-full grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-sm sm:flex sm:w-fit">
               <button
                 type="button"
                 onClick={() => setAdminInventorySubTab("catalog")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`min-w-0 min-h-12 px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center ${
                   adminInventorySubTab === "catalog"
                     ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
                     : "text-slate-600 hover:bg-slate-100"
@@ -2325,7 +2335,7 @@ export default function AdminPortal() {
               <button
                 type="button"
                 onClick={() => setAdminInventorySubTab("purchases")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`min-w-0 min-h-12 px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-center ${
                   adminInventorySubTab === "purchases"
                     ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
                     : "text-slate-600 hover:bg-slate-100"

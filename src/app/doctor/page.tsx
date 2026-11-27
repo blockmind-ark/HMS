@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import {
   Search,
@@ -49,22 +49,27 @@ export default function DoctorPortal() {
   const [notification, setNotification] = useState<string | null>(null);
 
   // Fetch Patients List
+  const patientRequest = useRef<AbortController | null>(null);
   const fetchPatients = async (query = "") => {
+    patientRequest.current?.abort();
+    const controller = new AbortController();
+    patientRequest.current = controller;
     setLoadingPatients(true);
     try {
-      const res = await fetch(`/api/doctor/patients?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/doctor/patients?query=${encodeURIComponent(query)}`, { signal: controller.signal });
       if (res.ok) {
         const data = await res.json();
+        if (controller.signal.aborted) return;
         setPatients(data.patients || []);
         // Automatically select the first patient if none is selected
-        if (!selectedPatientId && data.patients?.length > 0) {
-          setSelectedPatientId(data.patients[0].id);
+        if (data.patients?.length > 0) {
+          setSelectedPatientId(current => current ?? data.patients[0].id);
         }
       }
     } catch (e) {
-      console.error(e);
+      if (!controller.signal.aborted) console.error(e);
     } finally {
-      setLoadingPatients(false);
+      if (!controller.signal.aborted) setLoadingPatients(false);
     }
   };
 
@@ -85,7 +90,8 @@ export default function DoctorPortal() {
   };
 
   useEffect(() => {
-    fetchPatients(searchQuery);
+    const timer = setTimeout(() => { void fetchPatients(searchQuery); }, 350);
+    return () => { clearTimeout(timer); patientRequest.current?.abort(); };
   }, [searchQuery]);
 
   useEffect(() => {

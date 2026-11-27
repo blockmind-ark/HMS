@@ -14,6 +14,18 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get("category")?.trim() || "";
   const itemType = (searchParams.get("itemType")?.trim() || "ALL").toUpperCase(); // "ALL" | "MEDICINE" | "SURGICAL"
   const lowStockOnly = searchParams.get("lowStockOnly") === "true";
+  // Optional pagination: legacy callers still receive the complete result.
+  const pageParam = searchParams.get("page");
+  const sizeParam = searchParams.get("pageSize");
+  const paginated = pageParam !== null || sizeParam !== null;
+  const page = Number(pageParam ?? 1);
+  const pageSize = Number(sizeParam ?? 50);
+  if (paginated && (!Number.isSafeInteger(page) || page < 1 ||
+      !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100 ||
+      !Number.isSafeInteger((page - 1) * pageSize))) {
+    return NextResponse.json({ error: "Invalid pagination" }, { status: 400 });
+  }
+
 
   const andConditions: any[] = [];
 
@@ -44,9 +56,23 @@ export async function GET(req: NextRequest) {
 
   const whereClause = andConditions.length > 0 ? { AND: andConditions } : {};
 
-  // Fetch medicines with active approved batches
-  const medicines = await prisma.medicine.findMany({
+  // All catalogue reads share a snapshot, including totals and page details.
+  return prisma.$transaction(async (tx) => {
+  // Keep global low-stock counts accurate while fetching full batch details only for the page.
+  const stockWhere = { approvalStatus: "APPROVED" as const, quantity: { gt: 0 } };
+  const orderBy = [{ itemType: "asc" as const }, { name: "asc" as const }, { id: "asc" as const }];
+  const stockRows = paginated ? await tx.medicine.findMany({
     where: whereClause,
+    select: { id: true, threshold: true, batches: { where: stockWhere, select: { quantity: true } } },
+    orderBy,
+  }) : null;
+  const lowRows = stockRows?.filter(m => m.batches.reduce((sum, b) => sum + b.quantity, 0) <= m.threshold);
+  const matchingRows = lowStockOnly ? lowRows : stockRows;
+  const pageIds = matchingRows?.slice((page - 1) * pageSize, page * pageSize).map(m => m.id);
+
+  // Fetch medicines with active approved batches
+  const medicines = await tx.medicine.findMany({
+    where: pageIds ? { AND: [whereClause, { id: { in: pageIds } }] } : whereClause,
     include: {
       batches: {
         where: {
@@ -56,7 +82,7 @@ export async function GET(req: NextRequest) {
         orderBy: { expiryDate: "asc" }, // FEFO: First Expired, First Out
       },
     },
-    orderBy: [{ itemType: "asc" }, { name: "asc" }],
+    orderBy: paginated ? orderBy : [{ itemType: "asc" }, { name: "asc" }],
   });
 
   // Calculate available stock and check generic discount eligibility
@@ -99,31 +125,38 @@ export async function GET(req: NextRequest) {
 
   // Fetch overall catalog stats for tabs & category switcher
   const [totalMedicines, totalSurgical] = await Promise.all([
-    prisma.medicine.count({ where: { itemType: "MEDICINE" } }),
-    prisma.medicine.count({ where: { itemType: "SURGICAL" } }),
+    tx.medicine.count({ where: { itemType: "MEDICINE" } }),
+    tx.medicine.count({ where: { itemType: "SURGICAL" } }),
   ]);
 
   // Distinct categories matching current itemType selection
   const categoryWhere = itemType !== "ALL" ? { itemType } : {};
-  const allCategories = await prisma.medicine.findMany({
+  const allCategories = await tx.medicine.findMany({
     where: categoryWhere,
     select: { category: true },
     distinct: ["category"],
     orderBy: { category: "asc" },
   });
 
-  const lowStockCount = results.filter((m) => m.isLowStock).length;
+  const lowStockCount = lowRows?.length ?? results.filter((m) => m.isLowStock).length;
   const filteredResults = lowStockOnly ? results.filter((m) => m.isLowStock) : results;
 
+  const totalFound = matchingRows?.length ?? filteredResults.length;
   return NextResponse.json({
     medicines: filteredResults,
+    ...(paginated ? { pagination: {
+      page, pageSize, total: totalFound,
+      totalPages: Math.ceil(totalFound / pageSize),
+      hasNext: page * pageSize < totalFound,
+    } } : {}),
     summary: {
-      totalFound: filteredResults.length,
+      totalFound,
       totalMedicines,
       totalSurgical,
       totalCombined: totalMedicines + totalSurgical,
       categories: ["All", ...allCategories.map((c) => c.category)],
       lowStockCount,
     },
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
+  }, { isolationLevel: "RepeatableRead" });
 }

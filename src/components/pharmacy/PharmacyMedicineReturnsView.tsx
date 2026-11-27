@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   RotateCcw,
   Search,
@@ -247,8 +247,10 @@ export function PharmacyMedicineReturnsView({ onStockUpdated }: { onStockUpdated
   );
 
   // Submit Return
+  const returnLock = useRef(false);
   const handleSubmitReturn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (returnLock.current) return;
     if (returnItems.length === 0) {
       setSubmitError("Please add at least one item to return.");
       return;
@@ -258,6 +260,7 @@ export function PharmacyMedicineReturnsView({ onStockUpdated }: { onStockUpdated
       return;
     }
 
+    returnLock.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -315,6 +318,7 @@ export function PharmacyMedicineReturnsView({ onStockUpdated }: { onStockUpdated
     } catch (err: any) {
       setSubmitError(err.message || "Error submitting medicine return");
     } finally {
+      returnLock.current = false;
       setIsSubmitting(false);
     }
   };

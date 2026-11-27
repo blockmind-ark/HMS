@@ -294,18 +294,18 @@ export function MedicinePurchaseSheetView({
   return (
     <div className="space-y-6 animate-in fade-in pb-12">
       {/* Top Banner & Header */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="min-w-0 bg-white p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
               Complete Formulary · 289 Items
             </span>
             <span className="text-xs text-slate-500 font-medium">
               Ruqayya Medical Center Pharmacy &amp; Hospital Stock Sheet
             </span>
           </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Pill className="w-6 h-6 text-emerald-600" />
+          <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight flex items-start gap-2">
+            <Pill className="w-6 h-6 shrink-0 text-emerald-600" />
             <span>Medicine Inventory &amp; Purchase Sheet</span>
           </h2>
           <p className="text-xs text-slate-500">
@@ -314,10 +314,10 @@ export function MedicinePurchaseSheetView({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 border border-slate-200 transition-colors shadow-sm"
+            className="min-h-11 min-w-0 justify-center px-2 sm:px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 border border-slate-200 transition-colors shadow-sm"
             title="Download Full 289-Medicine Sheet as CSV"
           >
             <Download className="w-4 h-4 text-slate-600" />
@@ -327,7 +327,7 @@ export function MedicinePurchaseSheetView({
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors shadow-sm"
+            className="min-h-11 min-w-0 justify-center px-2 sm:px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-colors shadow-sm"
             title="Upload and Import Medicine CSV with Pre-Validation"
           >
             <Upload className="w-4 h-4" />
@@ -336,15 +336,15 @@ export function MedicinePurchaseSheetView({
 
           <button
             onClick={fetchMedicines}
-            className="p-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
+            className="min-h-11 min-w-0 flex items-center justify-center gap-2 px-3 py-2.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
             title="Refresh List"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-600" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-600" : ""}`} /><span className="text-xs font-bold">Refresh</span>
           </button>
 
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-[0.98]"
+            className="min-h-11 min-w-0 justify-center px-2 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             <span>Add Medicine Entry</span>
@@ -354,50 +354,50 @@ export function MedicinePurchaseSheetView({
 
       {/* 4 Summary Metric Cards (Visible in Admin Portal, hidden in Pharmacy Portal as requested) */}
       {summary && portalRole === "ADMIN" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
           {/* Total Cost */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Purchase Cost
               </span>
-              <h3 className="text-2xl font-black text-slate-900 font-mono">
+              <h3 className="break-words [overflow-wrap:anywhere] text-base sm:text-2xl font-black text-slate-900 font-mono">
                 Rs. {summary.totalCost.toLocaleString()}
               </h3>
               <p className="text-[11px] text-slate-500">
                 Across {summary.totalItemsCount} catalog medicines
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <Banknote className="w-6 h-6" />
             </div>
           </div>
 
           {/* Total Retail Value (T.Value) */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Retail Valuation (T.Value)
               </span>
-              <h3 className="text-2xl font-black text-emerald-950 font-mono">
+              <h3 className="break-words [overflow-wrap:anywhere] text-base sm:text-2xl font-black text-emerald-950 font-mono">
                 Rs. {summary.totalValue.toLocaleString()}
               </h3>
               <p className="text-[11px] text-emerald-600 font-semibold font-mono">
                 Margin: +Rs. {summary.potentialMargin.toLocaleString()}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
               <TrendingUp className="w-6 h-6" />
             </div>
           </div>
 
           {/* Total Units */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Total Dosage Units (Qty Pur)
               </span>
-              <h3 className="text-2xl font-black text-slate-900 font-mono">
+              <h3 className="break-words [overflow-wrap:anywhere] text-base sm:text-2xl font-black text-slate-900 font-mono">
                 {summary.totalUnits.toLocaleString()}{" "}
                 <span className="text-xs font-normal text-slate-400">tabs/units</span>
               </h3>
@@ -405,13 +405,13 @@ export function MedicinePurchaseSheetView({
                 Tabs, amps, vials, bottles &amp; sachets
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
               <Package className="w-6 h-6" />
             </div>
           </div>
 
           {/* Credit vs Cash */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div className="min-w-0 bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Credit vs. Cash Medicines
@@ -428,7 +428,7 @@ export function MedicinePurchaseSheetView({
                 Credit Balance: Rs. {summary.creditTotalCost.toLocaleString()}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
               <CreditCard className="w-6 h-6" />
             </div>
           </div>
@@ -521,7 +521,15 @@ export function MedicinePurchaseSheetView({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {portalRole === "ADMIN" && <div className="grid gap-3 p-3 md:hidden">
+          {paginatedMedicines.map((m) => <article key={m.id} className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words text-sm font-extrabold text-slate-900">{m.itemName}</p><p className="break-words text-xs text-slate-500">{m.formPotencySpec}</p></div><span className={`rounded-lg px-2 py-1 text-[11px] font-bold ${m.isCredit ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"}`}>{m.isCredit ? "Credit" : "Cash"}</span></div>
+            <div className="grid grid-cols-2 gap-3 text-xs"><div><p className="text-slate-500">Quantity purchased</p><p className="font-bold">{m.qtyPurchased.toLocaleString()} units</p><p className="text-[10px] text-slate-500">{m.pkgPacks} packs × {m.nosPerPack}</p></div><div><p className="text-slate-500">Batch / Expiry</p><p className="break-all font-bold">{m.batchNo}</p><p>{new Date(m.expiryDate).toLocaleDateString("en-GB")}</p></div><div><p className="text-slate-500">Total cost</p><p className="font-extrabold">Rs. {m.totalCost.toLocaleString()}</p></div><div><p className="text-slate-500">Stock value</p><p className="font-extrabold text-emerald-700">Rs. {m.totalValue.toLocaleString()}</p></div><div><p className="text-slate-500">Cost per unit</p><p className="font-bold">Rs. {m.perUnitCost.toFixed(2)}</p></div><div><p className="text-slate-500">Selling per unit</p><p className="font-bold">Rs. {m.perUnitSelling.toFixed(2)}</p></div></div>
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3"><button type="button" onClick={() => handleOpenEditModal(m)} className="min-h-11 rounded-lg border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-800">Edit entry</button><button type="button" onClick={() => setDeleteConfirmId(m.id)} className="min-h-11 rounded-lg border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700">Delete entry</button></div>
+          </article>)}
+          {!loading && paginatedMedicines.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No purchase entries match these filters.</p>}
+        </div>}
+        <div className={portalRole === "ADMIN" ? "hidden md:block overflow-x-auto" : "overflow-x-auto"}>
           <table className="w-full text-left text-xs border-collapse">
             {portalRole === "PHARMACIST" ? (
               // Pharmacist Compact View: 8 Columns capturing all data in one go without horizontal scrolling

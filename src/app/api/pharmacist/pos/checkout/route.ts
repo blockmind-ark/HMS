@@ -18,6 +18,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
+    if (items.some((it: any) => !it || typeof it.batchId !== "string" || !it.batchId ||
+      typeof it.medicineId !== "string" || !it.medicineId ||
+      !Number.isSafeInteger(it.quantity) || it.quantity <= 0 || it.quantity > 2147483647 ||
+      typeof it.unitPrice !== "number" || !Number.isFinite(it.unitPrice) || it.unitPrice < 0) ||
+      !["number", "string"].includes(typeof discount) || String(discount).trim() === "" ||
+      !Number.isFinite(Number(discount)) || Number(discount) < 0) {
+      return NextResponse.json({ error: "Invalid checkout quantity, price or discount" }, { status: 400 });
+    }
+
     // Verify patient if ID provided
     let patient = null;
     if (patientId) {
@@ -27,28 +36,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Generate unique sequential POS Sale Number: POS-YYYY-XXXX
-    const currentYear = new Date().getFullYear();
-    const totalSales = await prisma.pharmacySale.count();
-    let nextNum = totalSales + 1;
-    let saleNumber = `POS-${currentYear}-${String(nextNum).padStart(4, "0")}`;
-
-    let saleExists = await prisma.pharmacySale.findUnique({ where: { saleNumber } });
-    while (saleExists) {
-      nextNum++;
-      saleNumber = `POS-${currentYear}-${String(nextNum).padStart(4, "0")}`;
-      saleExists = await prisma.pharmacySale.findUnique({ where: { saleNumber } });
-    }
-
     // Calculate totals
     let rawSubtotal = 0;
     for (const item of items) {
       rawSubtotal += item.quantity * item.unitPrice;
     }
-    const finalTotal = Math.max(0, rawSubtotal - parseFloat(discount));
+    if (!Number.isFinite(rawSubtotal)) return NextResponse.json({ error: "Invalid checkout total" }, { status: 400 });
+    const finalTotal = Math.max(0, rawSubtotal - Number(discount));
 
     // Execute atomic transaction: deduct stock batches and record sale
     const saleResult = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(724001)::text`;
+    // Generate unique sequential POS Sale Number: POS-YYYY-XXXX
+    const currentYear = new Date().getFullYear();
+    const totalSales = await tx.pharmacySale.count();
+    let nextNum = totalSales + 1;
+    let saleNumber = `POS-${currentYear}-${String(nextNum).padStart(4, "0")}`;
+
+    let saleExists = await tx.pharmacySale.findUnique({ where: { saleNumber } });
+    while (saleExists) {
+      nextNum++;
+      saleNumber = `POS-${currentYear}-${String(nextNum).padStart(4, "0")}`;
+      saleExists = await tx.pharmacySale.findUnique({ where: { saleNumber } });
+    }
+
+
       // 1. Deduct stock from batches & inventory tables
       for (const item of items) {
         const batch = await tx.stockBatch.findUnique({
@@ -59,6 +71,9 @@ export async function POST(req: NextRequest) {
           throw new Error(`Stock batch for ${item.medicineName} not found`);
         }
 
+        if (batch.medicineId !== item.medicineId || batch.approvalStatus !== "APPROVED") {
+          throw new Error("Invalid or unapproved stock batch");
+        }
         if (batch.quantity < item.quantity) {
           throw new Error(
             `Insufficient stock for ${item.medicineName} (Available: ${batch.quantity}, Requested: ${item.quantity})`
@@ -66,12 +81,13 @@ export async function POST(req: NextRequest) {
         }
 
         // Deduct from active batch
-        await tx.stockBatch.update({
-          where: { id: item.batchId },
-          data: {
-            quantity: { decrement: item.quantity },
-          },
+        const deducted = await tx.stockBatch.updateMany({
+          where: { id: item.batchId, medicineId: item.medicineId, approvalStatus: "APPROVED", quantity: { gte: item.quantity } },
+          data: { quantity: { decrement: item.quantity } },
         });
+        if (deducted.count !== 1) {
+          throw new Error(`Insufficient stock for ${item.medicineName}; stock changed during checkout`);
+        }
       }
 
       // 2. Create PharmacySale
@@ -81,7 +97,7 @@ export async function POST(req: NextRequest) {
           patientId: patient ? patient.id : null,
           userId: session.user.id,
           totalAmount: finalTotal,
-          discount: parseFloat(discount),
+          discount: Number(discount),
           items: {
             create: items.map((it: any) => ({
               medicineId: it.medicineId,

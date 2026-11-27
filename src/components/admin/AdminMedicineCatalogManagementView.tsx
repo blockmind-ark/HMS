@@ -167,17 +167,17 @@ export function AdminMedicineCatalogManagementView() {
       )}
 
       {/* Header & Controls */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+      <div className="min-w-0 bg-white p-3 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-purple-50 text-purple-700 rounded-xl">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="shrink-0 p-2 bg-purple-50 text-purple-700 rounded-xl">
                 <Sliders className="w-5 h-5 text-purple-600" />
               </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                   <span>Dispensary POS Catalog &amp; Dynamic &ldquo;Per Off&rdquo; Control</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                  <span className="inline-flex max-w-full rounded-lg bg-purple-100 px-3 py-1.5 text-[11px] font-bold text-purple-800">
                     Direct Admin Control
                   </span>
                 </h3>
@@ -188,11 +188,11 @@ export function AdminMedicineCatalogManagementView() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <a
               href="/api/inventory/medicines/export"
               download
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-200"
+              className="min-h-11 min-w-0 justify-center text-center px-2 sm:px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-200"
               title="Download Medicine CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -202,7 +202,7 @@ export function AdminMedicineCatalogManagementView() {
             <button
               type="button"
               onClick={() => setIsImportModalOpen(true)}
-              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              className="min-h-11 min-w-0 justify-center text-center px-2 sm:px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
               title="Upload and Import Medicine CSV"
             >
               <Upload className="w-3.5 h-3.5" />
@@ -212,7 +212,7 @@ export function AdminMedicineCatalogManagementView() {
             <button
               onClick={fetchMedicines}
               disabled={loading}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="col-span-2 sm:col-span-1 min-h-11 min-w-0 justify-center text-center px-2 sm:px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               <span>Refresh Catalog</span>
@@ -265,7 +265,18 @@ export function AdminMedicineCatalogManagementView() {
           </div>
         </div>
 
-        <div className="w-full overflow-x-auto">
+        <div className="grid gap-3 p-3 md:hidden">
+          {paginatedMedicines.map((m) => {
+            const net = m.discountedPrice ?? (m.perOff > 0 ? Number((m.sellingPrice * (1 - m.perOff / 100)).toFixed(2)) : m.sellingPrice);
+            return <article key={m.id} className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="break-words text-sm font-extrabold text-slate-900">{m.name}</p><p className="break-words text-xs text-slate-500">{m.genericName}</p></div><span className="rounded-lg bg-purple-100 px-2 py-1 text-[11px] font-bold text-purple-800">{m.category}</span></div>
+              <div className="grid grid-cols-2 gap-3 text-xs"><div><p className="text-slate-500">Available stock</p><p className={`font-extrabold ${m.isLowStock ? "text-rose-700" : "text-slate-900"}`}>{m.totalStock} units {m.isLowStock ? "· Low" : ""}</p><p className="text-[10px] text-slate-500">Alert at ≤ {m.threshold}</p></div><div><p className="text-slate-500">Discount</p><p className="font-extrabold text-purple-800">{m.perOff || 0}% off</p></div><div><p className="text-slate-500">Purchase price</p><p className="font-bold">Rs. {m.purchasePrice}</p></div><div><p className="text-slate-500">Retail price</p><p className="font-bold">Rs. {m.sellingPrice}</p></div></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3"><div><p className="text-[10px] font-bold uppercase text-slate-500">Net selling price</p><p className="text-sm font-black text-emerald-700">Rs. {net.toLocaleString()}</p></div><button type="button" onClick={() => handleOpenEdit(m)} className="min-h-11 rounded-xl bg-purple-600 px-3 text-xs font-bold text-white">Update Medicine</button></div>
+            </article>;
+          })}
+          {!loading && paginatedMedicines.length === 0 && <p className="py-6 text-center text-xs text-slate-500">No medicines matching your search.</p>}
+        </div>
+        <div className="hidden md:block w-full overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700 border-collapse">
             <thead className="bg-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>

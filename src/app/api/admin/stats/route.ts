@@ -21,14 +21,22 @@ export async function GET() {
   ] = await Promise.all([
     prisma.patient.count(),
     prisma.visit.count(),
-    prisma.invoice.findMany({
+    prisma.invoice.aggregate({
       where: { status: "PAID" },
-      include: { items: true },
+      _sum: { totalAmount: true },
     }),
     prisma.pharmacySale.findMany({
-      include: {
+      select: {
+        totalAmount: true,
         items: {
-          include: { medicine: { include: { batches: true } } },
+          select: {
+            quantity: true,
+            unitPrice: true,
+            totalPrice: true,
+            medicine: {
+              select: { id: true, name: true, batches: { select: { purchasePrice: true } } },
+            },
+          },
         },
       },
     }),
@@ -42,14 +50,15 @@ export async function GET() {
       where: { status: "PENDING_APPROVAL" },
     }),
     prisma.stockBatch.findMany({
-      include: { medicine: true },
+      where: { approvalStatus: "APPROVED" },
+      select: { quantity: true, purchasePrice: true },
     }),
   ]);
 
   const pendingApprovalsCount = pendingStockCount + pendingAdjustmentsCount + pendingShiftsCount;
 
   // Financial calculations
-  const totalClinicalRevenue = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+  const totalClinicalRevenue = invoices._sum.totalAmount ?? 0;
   const totalPharmacyRevenue = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
   const totalCombinedRevenue = totalClinicalRevenue + totalPharmacyRevenue;
 
@@ -94,17 +103,16 @@ export async function GET() {
 
   // Total current inventory valuation
   const inventoryValuation = batches
-    .filter((b) => b.approvalStatus === "APPROVED")
     .reduce((sum, b) => sum + b.quantity * b.purchasePrice, 0);
 
   // Low stock detection (approved batches remaining <= threshold)
   const allMedicines = await prisma.medicine.findMany({
-    include: {
+    select: {
+      id: true, name: true, genericName: true, category: true,
+      itemType: true, threshold: true,
       batches: {
-        where: {
-          approvalStatus: "APPROVED",
-          quantity: { gt: 0 },
-        },
+        where: { approvalStatus: "APPROVED", quantity: { gt: 0 } },
+        select: { quantity: true },
       },
     },
     orderBy: { name: "asc" },
